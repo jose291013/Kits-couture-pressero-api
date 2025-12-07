@@ -33,7 +33,7 @@ const auth = new google.auth.JWT(
   creds.client_email,
   null,
   privateKey,
-  ['https://www.googleapis.com/auth/spreadsheets.readonly']
+  ['https://www.googleapis.com/auth/spreadsheets']
 );
 const sheets = google.sheets({ version: 'v4', auth });
 
@@ -43,6 +43,65 @@ const app = express();
 // CORS : en dev on autorise tout, en prod tu pourras restreindre à ton domaine Pressero
 app.use(cors());
 app.use(express.json());
+
+// Crée l'onglet pour cet email s'il n'existe pas encore
+async function ensureSheetExists(sheetName) {
+  // 1) Récupérer la liste des onglets
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: SPREADSHEET_ID
+  });
+
+  const already = (meta.data.sheets || []).find(s =>
+    s.properties && s.properties.title === sheetName
+  );
+
+  if (already) {
+    // L'onglet existe déjà → rien à faire
+    return;
+  }
+
+  console.log(`[KITS] Création de l’onglet "${sheetName}"`);
+
+  // 2) Créer le nouvel onglet
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          addSheet: {
+            properties: {
+              title: sheetName
+            }
+          }
+        }
+      ]
+    }
+  });
+
+  // 3) Poser la ligne d'en-têtes (A1:J1)
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `'${sheetName}'!A1:J1`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [[
+        'KitId',               // A
+        'KitName',             // B
+        'ImageUrl',            // C
+        'DefaultQtyLivret',    // D
+        'DefaultQtyPochette',  // E
+        'DefaultQtyPatron',    // F
+        'PriceLivret',         // G
+        'PricePochette',       // H
+        'PricePatron',         // I
+        'Active'               // J (Oui/Non)
+      ]]
+    }
+  });
+
+  console.log(`[KITS] En-têtes initialisés pour "${sheetName}"`);
+}
+
 
 // Petite aide : convertion "1,2" -> nombre
 function parseNumberFromSheet(value) {
@@ -72,6 +131,10 @@ app.get('/kits', async (req, res) => {
   const range = `'${sheetName}'!A2:J`;
 
   try {
+    // Crée l'onglet + en-têtes s'il n'existe pas encore
+    await ensureSheetExists(sheetName);
+
+    // Puis on lit les lignes de données
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -120,15 +183,7 @@ app.get('/kits', async (req, res) => {
   } catch (err) {
     console.error('❌ Erreur lors de la lecture du sheet pour', sheetName, err.message);
 
-    // Cas fréquent : onglet inexistant
-    if (err && err.message && err.message.includes('Unable to parse range')) {
-      return res.status(404).json({
-        error: 'Sheet not found for this email',
-        email,
-        sheetName
-      });
-    }
-
+    
     res.status(500).json({
       error: 'Error reading Google Sheet',
       details: err.message || String(err)
