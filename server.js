@@ -78,26 +78,36 @@ async function ensureSheetExists(sheetName) {
     }
   });
 
-  // 3) Poser la ligne d'en-têtes (A1:J1)
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `'${sheetName}'!A1:J1`,
-    valueInputOption: 'RAW',
-    requestBody: {
-      values: [[
-        'KitId',               // A
-        'KitName',             // B
-        'ImageUrl',            // C
-        'DefaultQtyLivret',    // D
-        'DefaultQtyPochette',  // E
-        'DefaultQtyPatron',    // F
-        'PriceLivret',         // G
-        'PricePochette',       // H
-        'PricePatron',         // I
-        'Active'               // J (Oui/Non)
-      ]]
-    }
-  });
+  // 3) Poser la ligne d'en-têtes (A1:S1)
+await sheets.spreadsheets.values.update({
+  spreadsheetId: SPREADSHEET_ID,
+  range: `'${sheetName}'!A1:S1`,   // <-- A → S (19 colonnes)
+  valueInputOption: 'RAW',
+  requestBody: {
+    values: [[
+      'KitId',
+      'KitName',
+      'ImageURL',
+      'DefaultQtyLivret',
+      'DefaultQtyPochette',
+      'DefaultQtyPatron',
+      'NombrePagesLivret',
+      'TypeLivret',
+      'TypeImpressionCouverture',
+      'TypeImpressionCorps',
+      'PapierCouverture',
+      'PapierCorps',
+      'FormatFermeLivret',
+      'Pochette',
+      'MiseEnPochette',
+      'PatronM2',
+      'ImpressionPatron',
+      'Active',
+      'PJMOptionsJSON'
+    ]]
+  }
+});
+
 
   console.log(`[KITS] En-têtes initialisés pour "${sheetName}"`);
 }
@@ -128,7 +138,7 @@ app.get('/kits', async (req, res) => {
   const sheetName = email;
 
   // Plage : en-têtes en ligne 1, data à partir de A2:J (KitId .. Active)
-  const range = `'${sheetName}'!A2:J`;
+  const range = `'${sheetName}'!A2:S`;
 
   try {
     // Crée l'onglet + en-têtes s'il n'existe pas encore
@@ -144,35 +154,83 @@ app.get('/kits', async (req, res) => {
 
     // Map chaque ligne -> objet
     const kits = rows
-      .filter(row => row && row.length > 0)
-      .map(row => {
-        const kitId             = row[0] || '';
-        const kitName           = row[1] || '';
-        const imageUrl          = row[2] || '';
-        const defaultQtyLivret  = parseNumberFromSheet(row[3]);
-        const defaultQtyPochette= parseNumberFromSheet(row[4]);
-        const defaultQtyPatron  = parseNumberFromSheet(row[5]);
-        const priceLivret       = parseNumberFromSheet(row[6]);
-        const pricePochette     = parseNumberFromSheet(row[7]);
-        const pricePatron       = parseNumberFromSheet(row[8]);
-        const activeRaw         = (row[9] || '').toString().trim().toLowerCase();
+  .filter(row => row && row.length > 0)
+  .map(row => {
+    const [
+      kitId,
+      kitName,
+      imageUrl,
+      defaultQtyLivretRaw,
+      defaultQtyPochetteRaw,
+      defaultQtyPatronRaw,
+      nombrePagesLivret,
+      typeLivret,
+      typeImpressionCouverture,
+      typeImpressionCorps,
+      papierCouverture,
+      papierCorps,
+      formatFermeLivret,
+      pochette,
+      miseEnPochette,
+      patronM2,
+      impressionPatron,
+      activeFlag,
+      pjmOptionsJson
+    ] = row;
 
-        const isActive = ['oui', 'yes', 'si', 'sí', '1', 'true'].includes(activeRaw);
+    const defaultQtyLivret   = parseNumberFromSheet(defaultQtyLivretRaw);
+    const defaultQtyPochette = parseNumberFromSheet(defaultQtyPochetteRaw);
+    const defaultQtyPatron   = parseNumberFromSheet(defaultQtyPatronRaw);
 
-        return {
-          kitId,
-          name: kitName,
-          imageUrl,
-          defaultQtyLivret,
-          defaultQtyPochette,
-          defaultQtyPatron,
-          priceLivret,
-          pricePochette,
-          pricePatron,
-          active: isActive
-        };
-      })
-      .filter(kit => kit.active); // on ne renvoie que les kits actifs
+    // Par défaut : actif sauf si explicitement "non", "no", "0", "false"
+    const activeRaw = (activeFlag || '').toString().trim().toLowerCase();
+    const isActive = !['non', 'no', '0', 'false'].includes(activeRaw);
+
+    // Parsing éventuel du JSON PJMOptionsJSON (facultatif pour l’instant)
+    let pjmOptions = null;
+    if (pjmOptionsJson && typeof pjmOptionsJson === 'string') {
+      try {
+        pjmOptions = JSON.parse(pjmOptionsJson);
+      } catch (e) {
+        console.warn('[KITS] PJMOptionsJSON invalide pour le kit', kitId, e.message);
+      }
+    }
+
+    return {
+      kitId: kitId || '',
+      name: kitName || '',
+      imageUrl: imageUrl || '',
+      defaultQtyLivret,
+      defaultQtyPochette,
+      defaultQtyPatron,
+
+      // Placeholders pour l’UI actuelle (on mettra le vrai prix via PJM plus tard)
+      priceLivret: 0,
+      pricePochette: 0,
+      pricePatron: 0,
+
+      active: isActive,
+
+      // On garde toute la config métier accessible si on en a besoin plus tard
+      config: {
+        nombrePagesLivret: nombrePagesLivret || '',
+        typeLivret: typeLivret || '',
+        typeImpressionCouverture: typeImpressionCouverture || '',
+        typeImpressionCorps: typeImpressionCorps || '',
+        papierCouverture: papierCouverture || '',
+        papierCorps: papierCorps || '',
+        formatFermeLivret: formatFermeLivret || '',
+        pochette: pochette || '',
+        miseEnPochette: miseEnPochette || '',
+        patronM2: patronM2 || '',
+        impressionPatron: impressionPatron || ''
+      },
+
+      pjmOptions
+    };
+  })
+  .filter(kit => kit.active);
+
 
     res.json({
       email,
