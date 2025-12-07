@@ -121,6 +121,82 @@ function parseNumberFromSheet(value) {
   return isNaN(n) ? 0 : n;
 }
 
+// ===================== ROUTES ADMIN KITS =====================
+
+// GET /admin/kits?email=xxx
+// - Crée l’onglet pour cet email si besoin (avec les en-têtes)
+// - Lit toutes les lignes et renvoie la liste des kits
+app.get('/admin/kits', async (req, res) => {
+  const rawEmail = (req.query.email || '').trim();
+  const email = rawEmail.toLowerCase();
+
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email' });
+  }
+
+  try {
+    // On réutilise la logique d’onglet + en-têtes
+    const sheetName = email;
+    await ensureSheetExists(sheetName); // ta fonction existe déjà plus haut
+
+    // ⚠️ adapte la plage en fonction de ton nombre de colonnes
+    // Ici A → S (19 colonnes, index 0..18)
+    const range = `'${sheetName}'!A2:S`;
+
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEETS_SPREADSHEET_ID,
+      range
+    });
+
+    const rows = resp.data.values || [];
+
+    const kits = rows
+      .filter(r => r && r.length > 0)
+      .map((row, index) => {
+        return {
+          // Infos techniques
+          rowIndex: index + 2,           // ligne dans Google Sheet
+          sheetName,
+
+          // Mapping colonnes (ordre = header que tu as défini)
+          kitId:                row[0]  || '',
+          kitName:              row[1]  || '',
+          imageUrl:             row[2]  || '',
+          defaultQtyLivret:     row[3]  || '',
+          defaultQtyPochette:   row[4]  || '',
+          defaultQtyPatron:     row[5]  || '',
+          nombrePagesLivret:    row[6]  || '',
+          typeLivret:           row[7]  || '',
+          typeImpressionCouv:   row[8]  || '',
+          typeImpressionCorps:  row[9]  || '',
+          papierCouverture:     row[10] || '',
+          papierCorps:          row[11] || '',
+          formatFermeLivret:    row[12] || '',
+          pochette:             row[13] || '',
+          miseEnPochette:       row[14] || '',
+          patronM2:             row[15] || '',
+          impressionPatron:     row[16] || '',
+          activeRaw:            row[17] || '',
+          pjmOptionsJson:       row[18] || ''
+        };
+      });
+
+    return res.json({
+      email,
+      sheetName,
+      count: kits.length,
+      kits
+    });
+  } catch (err) {
+    console.error('[ADMIN /admin/kits] Error:', err);
+    return res.status(500).json({
+      error: 'Internal error while reading kits',
+      details: err.message
+    });
+  }
+});
+
+
 // Endpoint de test
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', spreadsheetId: SPREADSHEET_ID });
