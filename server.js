@@ -122,6 +122,32 @@ function parseNumberFromSheet(value) {
   return isNaN(n) ? 0 : n;
 }
 
+// Mapping objet kit -> ligne Google Sheet (19 colonnes A..S)
+function kitToRow(kit) {
+  return [
+    kit.kitId || '',                   // A - KitId
+    kit.kitName || '',                 // B - KitName
+    kit.imageUrl || '',                // C - ImageURL
+    kit.defaultQtyLivret || '',        // D - DefaultQtyLivret
+    kit.defaultQtyPochette || '',      // E - DefaultQtyPochette
+    kit.defaultQtyPatron || '',        // F - DefaultQtyPatron
+    kit.nombrePagesLivret || '',       // G - NombrePagesLivret
+    kit.typeLivret || '',              // H - TypeLivret
+    kit.typeImpressionCouverture || '',// I - TypeImpressionCouverture
+    kit.typeImpressionCorps || '',     // J - TypeImpressionCorps
+    kit.papierCouverture || '',        // K - PapierCouverture
+    kit.papierCorps || '',             // L - PapierCorps
+    kit.formatFermeLivret || '',       // M - FormatFermeLivret
+    kit.pochette || '',                // N - Pochette
+    kit.miseEnPochette || '',          // O - MiseEnPochette
+    kit.patronM2 || '',                // P - PatronM2
+    kit.impressionPatron || '',        // Q - ImpressionPatron
+    kit.active ? 'Oui' : 'Non',        // R - Active
+    kit.pjmOptionsJson || ''           // S - PJMOptionsJSON
+  ];
+}
+
+
 // ===================== ROUTES ADMIN KITS =====================
 
 // GET /admin/kits?email=xxx
@@ -196,6 +222,112 @@ app.get('/admin/kits', async (req, res) => {
     });
   }
 });
+
+// ===================== ADMIN - SAUVEGARDE D'UN KIT =====================
+app.post('/admin/kits/save', express.json(), async (req, res) => {
+  try {
+    const body = req.body || {};
+    const rawEmail = (body.email || '').trim();
+    const email = rawEmail.toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ error: 'Missing email' });
+    }
+
+    const sheetName = email;
+
+    // On s'assure que l'onglet existe (avec les bons en-têtes)
+    await ensureSheetExists(sheetName);
+
+    const rawKitId = (body.kitId || '').trim();
+    const generatedKitId = 'KIT-' + Date.now();
+    const finalKitId = rawKitId || generatedKitId;
+
+    // On lit les lignes existantes
+    const range = `'${sheetName}'!A2:S`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+    const rows = response.data.values || [];
+
+    // On cherche si une ligne a déjà ce KitId
+    let rowIndex = null; // index réel dans le sheet (2,3,4… car A2 = 2)
+    rows.forEach((row, idx) => {
+      if (
+        row &&
+        row[0] &&
+        row[0].toString().trim() === finalKitId
+      ) {
+        rowIndex = idx + 2; // +2 car le premier data row est A2
+      }
+    });
+
+    // On construit l'objet kit à partir du body
+    const kit = {
+      kitId: finalKitId,
+      kitName: body.kitName || '',
+      imageUrl: body.imageUrl || '',
+      defaultQtyLivret: body.defaultQtyLivret || '',
+      defaultQtyPochette: body.defaultQtyPochette || '',
+      defaultQtyPatron: body.defaultQtyPatron || '',
+      nombrePagesLivret: body.nombrePagesLivret || '',
+      typeLivret: body.typeLivret || '',
+      typeImpressionCouverture: body.typeImpressionCouverture || '',
+      typeImpressionCorps: body.typeImpressionCorps || '',
+      papierCouverture: body.papierCouverture || '',
+      papierCorps: body.papierCorps || '',
+      formatFermeLivret: body.formatFermeLivret || '',
+      pochette: body.pochette || '',
+      miseEnPochette: body.miseEnPochette || '',
+      patronM2: body.patronM2 || '',
+      impressionPatron: body.impressionPatron || '',
+      active:
+        body.active === true ||
+        body.active === 'true' ||
+        body.active === 'Oui',
+      pjmOptionsJson: body.pjmOptionsJson || body.PJMOptionsJSON || ''
+    };
+
+    const rowValues = [kitToRow(kit)];
+
+    if (rowIndex) {
+      // ---- UPDATE d'une ligne existante ----
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `'${sheetName}'!A${rowIndex}:S${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: rowValues
+        }
+      });
+    } else {
+      // ---- APPEND d'une nouvelle ligne ----
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `'${sheetName}'!A2:S`,
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: {
+          values: rowValues
+        }
+      });
+    }
+
+    return res.json({
+      ok: true,
+      email,
+      kitId: finalKitId
+    });
+  } catch (err) {
+    console.error('[ADMIN /admin/kits/save] Error:', err);
+    return res.status(500).json({
+      error: 'Error saving kit',
+      details: err.message || String(err)
+    });
+  }
+});
+
 
 
 // Endpoint de test
