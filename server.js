@@ -435,25 +435,72 @@ app.get('/admin/pjm/options', async (req, res) => {
   }
 });
 
+/**
+ * Transforme les selections simplifiées
+ *   [{ optionId, key, value }, ...]
+ * en tableau Options au format attendu par PJM.
+ *
+ * - Pour les listes déroulantes : key === "value" → on met .Value
+ * - Pour les champs libres (quantités, etc.) : key (souvent "default") → Settings[]
+ */
+function buildPjmOptionsFromSelections(selections) {
+  if (!Array.isArray(selections)) return [];
+
+  const byId = {};
+
+  selections.forEach(sel => {
+    if (!sel || !sel.optionId) return;
+
+    const optId = String(sel.optionId);
+    let opt = byId[optId];
+
+    if (!opt) {
+      opt = {
+        Id: optId,
+        Options: [],
+        Settings: []
+      };
+      byId[optId] = opt;
+    }
+
+    const key = sel.key || 'value';
+    const value = sel.value != null ? String(sel.value) : '';
+
+    if (!value) return;
+
+    if (key === 'value') {
+      // 🔹 Cas des listes déroulantes :
+      // on utilise la propriété "Value" (UUID du choix)
+      opt.Value = value;
+    } else {
+      // 🔹 Cas des champs "default", "qty", etc. :
+      // on pousse dans Settings[]
+      opt.Settings.push({
+        Key: key,
+        Value: value
+      });
+    }
+  });
+
+  return Object.values(byId);
+}
+
+
 // ===================== ADMIN - OPTIONS + PRIX PJM =====================
 // On envoie à cette route un tableau "selections" simplifié :
 // Body: { engineId?: string, selections?: [ { optionId, key, value } ] }
 // -> appelle PJM avec Operation: "optionsandprice"
 app.post('/admin/pjm/optionsandprice', async (req, res) => {
   try {
-    const engineId = (req.body.engineId || PJM_ENGINE_INTEGRATION_ID || '').trim();
+    const engineId = (req.body.engineId || process.env.PJM_ENGINE_INTEGRATION_ID || '').trim();
     const selections = Array.isArray(req.body.selections) ? req.body.selections : [];
 
     if (!engineId) {
-      return res.status(400).json({ error: 'Missing engineId' });
+      return res.status(400).json({ error: 'Missing engineId / PJM_ENGINE_INTEGRATION_ID' });
     }
 
-    // On transforme les selections en Options minimales pour PJM
-    // Pour ton moteur, le plus simple est : [{ Id, Value }]
-    const optionsForPjm = selections.map(sel => ({
-      Id: sel.optionId,
-      Value: sel.value
-    }));
+    // 🔹 On construit le tableau Options au format PJM
+    const optionsForPjm = buildPjmOptionsFromSelections(selections);
 
     const payload = {
       Operation: 'optionsandprice',
@@ -463,7 +510,29 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
 
     console.log('[PJM] Payload envoyé à /public/engine :', JSON.stringify(payload, null, 2));
 
-    const data = await callPjmApi('/public/engine', payload);
+    const token = await getPjmToken();
+
+    // ⚠️ PJM_BASE_URL doit être du type "https://ams.printjobmanager.com/api"
+    const resp = await fetch(`${process.env.PJM_BASE_URL}/public/engine`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      console.error('[PJM] Erreur optionsandprice', resp.status, txt);
+      return res.status(500).json({
+        error: 'Appel PJM optionsandprice échoué',
+        status: resp.status,
+        body: txt
+      });
+    }
+
+    const data = await resp.json();
 
     res.json({
       price: data.Price ?? null,
@@ -472,13 +541,14 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
       raw: data
     });
   } catch (err) {
-    console.error('[PJM] Erreur optionsandprice', err);
+    console.error('[PJM] Erreur /admin/pjm/optionsandprice', err);
     res.status(500).json({
-      error: 'Error loading PJM options & price',
+      error: 'Erreur serveur /admin/pjm/optionsandprice',
       details: err.message || String(err)
     });
   }
 });
+
 
 
 
