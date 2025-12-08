@@ -7,10 +7,11 @@ const PORT = process.env.PORT || 3000;
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 const GOOGLE_SHEETS_SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 const SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-// ====== CONFIG PJM (auth dynamique) ======
-const PJM_API_BASE = process.env.PJM_API_BASE || 'https://ams.printjobmanager.com/api';
 
-// Ces 2 (ou 3) variables doivent être définies dans Render
+// ====== CONFIG PJM (auth dynamique) ======
+const PJM_BASE_URL = process.env.PJM_BASE_URL || 'https://ams.printjobmanager.com/api';
+
+// Ces variables doivent être définies dans Render
 const PJM_USERNAME = process.env.PJM_USERNAME;
 const PJM_PASSWORD = process.env.PJM_PASSWORD;
 
@@ -19,15 +20,13 @@ const PJM_ENGINE_PRODUCT_ID =
   process.env.PJM_ENGINE_PRODUCT_ID || '6b58e620-e943-4785-be35-88285a3bd42a';
 
 // Petit cache en mémoire pour le token PJM
-let pjmAuthCache = {
+let pjmTokenCache = {
   token: null,
   // timestamp en ms
   expiresAt: 0
 };
 
-
-
-
+// ====== CHECK ENV GOOGLE ======
 if (!SPREADSHEET_ID) {
   console.error('❌ GOOGLE_SHEETS_SPREADSHEET_ID manquant dans les variables d’environnement.');
   process.exit(1);
@@ -65,6 +64,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ===================== HELPERS GOOGLE SHEETS =====================
+
 // Crée l'onglet pour cet email s'il n'existe pas encore
 async function ensureSheetExists(sheetName) {
   // 1) Récupérer la liste des onglets
@@ -72,8 +73,8 @@ async function ensureSheetExists(sheetName) {
     spreadsheetId: SPREADSHEET_ID
   });
 
-  const already = (meta.data.sheets || []).find(s =>
-    s.properties && s.properties.title === sheetName
+  const already = (meta.data.sheets || []).find(
+    (s) => s.properties && s.properties.title === sheetName
   );
 
   if (already) {
@@ -100,41 +101,41 @@ async function ensureSheetExists(sheetName) {
   });
 
   // 3) Poser la ligne d'en-têtes (A1:S1)
-await sheets.spreadsheets.values.update({
-  spreadsheetId: SPREADSHEET_ID,
-  range: `'${sheetName}'!A1:S1`,   // <-- A → S (19 colonnes)
-  valueInputOption: 'RAW',
-  requestBody: {
-    values: [[
-      'KitId',
-      'KitName',
-      'ImageURL',
-      'DefaultQtyLivret',
-      'DefaultQtyPochette',
-      'DefaultQtyPatron',
-      'NombrePagesLivret',
-      'TypeLivret',
-      'TypeImpressionCouverture',
-      'TypeImpressionCorps',
-      'PapierCouverture',
-      'PapierCorps',
-      'FormatFermeLivret',
-      'Pochette',
-      'MiseEnPochette',
-      'PatronM2',
-      'ImpressionPatron',
-      'Active',
-      'PJMOptionsJSON'
-    ]]
-  }
-});
-
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `'${sheetName}'!A1:S1`, // <-- A → S (19 colonnes)
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [
+        [
+          'KitId', // A
+          'KitName', // B
+          'ImageURL', // C
+          'DefaultQtyLivret', // D
+          'DefaultQtyPochette', // E
+          'DefaultQtyPatron', // F
+          'NombrePagesLivret', // G
+          'TypeLivret', // H
+          'TypeImpressionCouverture', // I
+          'TypeImpressionCorps', // J
+          'PapierCouverture', // K
+          'PapierCorps', // L
+          'FormatFermeLivret', // M
+          'Pochette', // N
+          'MiseEnPochette', // O
+          'PatronM2', // P
+          'ImpressionPatron', // Q
+          'Active', // R
+          'PJMOptionsJSON' // S
+        ]
+      ]
+    }
+  });
 
   console.log(`[KITS] En-têtes initialisés pour "${sheetName}"`);
 }
 
-
-// Petite aide : convertion "1,2" -> nombre
+// Petite aide : conversion "1,2" -> nombre
 function parseNumberFromSheet(value) {
   if (value == null) return 0;
   const v = String(value).trim().replace(',', '.');
@@ -145,30 +146,34 @@ function parseNumberFromSheet(value) {
 // Mapping objet kit -> ligne Google Sheet (19 colonnes A..S)
 function kitToRow(kit) {
   return [
-    kit.kitId || '',                   // A - KitId
-    kit.kitName || '',                 // B - KitName
-    kit.imageUrl || '',                // C - ImageURL
-    kit.defaultQtyLivret || '',        // D - DefaultQtyLivret
-    kit.defaultQtyPochette || '',      // E - DefaultQtyPochette
-    kit.defaultQtyPatron || '',        // F - DefaultQtyPatron
-    kit.nombrePagesLivret || '',       // G - NombrePagesLivret
-    kit.typeLivret || '',              // H - TypeLivret
-    kit.typeImpressionCouverture || '',// I - TypeImpressionCouverture
-    kit.typeImpressionCorps || '',     // J - TypeImpressionCorps
-    kit.papierCouverture || '',        // K - PapierCouverture
-    kit.papierCorps || '',             // L - PapierCorps
-    kit.formatFermeLivret || '',       // M - FormatFermeLivret
-    kit.pochette || '',                // N - Pochette
-    kit.miseEnPochette || '',          // O - MiseEnPochette
-    kit.patronM2 || '',                // P - PatronM2
-    kit.impressionPatron || '',        // Q - ImpressionPatron
-    kit.active ? 'Oui' : 'Non',        // R - Active
-    kit.pjmOptionsJson || ''           // S - PJMOptionsJSON
+    kit.kitId || '', // A - KitId
+    kit.kitName || '', // B - KitName
+    kit.imageUrl || '', // C - ImageURL
+    kit.defaultQtyLivret || '', // D - DefaultQtyLivret
+    kit.defaultQtyPochette || '', // E - DefaultQtyPochette
+    kit.defaultQtyPatron || '', // F - DefaultQtyPatron
+    kit.nombrePagesLivret || '', // G - NombrePagesLivret
+    kit.typeLivret || '', // H - TypeLivret
+    kit.typeImpressionCouverture || '', // I - TypeImpressionCouverture
+    kit.typeImpressionCorps || '', // J - TypeImpressionCorps
+    kit.papierCouverture || '', // K - PapierCouverture
+    kit.papierCorps || '', // L - PapierCorps
+    kit.formatFermeLivret || '', // M - FormatFermeLivret
+    kit.pochette || '', // N - Pochette
+    kit.miseEnPochette || '', // O - MiseEnPochette
+    kit.patronM2 || '', // P - PatronM2
+    kit.impressionPatron || '', // Q - ImpressionPatron
+    kit.active ? 'Oui' : 'Non', // R - Active
+    kit.pjmOptionsJson || '' // S - PJMOptionsJSON
   ];
 }
 
+// ===================== HELPERS PJM (AUTH + APPEL) =====================
+
 async function getPjmToken() {
   const now = Date.now();
+
+  // Token encore valide ?
   if (pjmTokenCache.token && pjmTokenCache.expiresAt > now + 60_000) {
     return pjmTokenCache.token;
   }
@@ -205,6 +210,7 @@ async function getPjmToken() {
 
   return pjmTokenCache.token;
 }
+
 async function callPjmApi(path, body) {
   const token = await getPjmToken();
   const url = `${PJM_BASE_URL}${path}`;
@@ -213,7 +219,7 @@ async function callPjmApi(path, body) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`
     },
     body: JSON.stringify(body || {})
   });
@@ -225,8 +231,6 @@ async function callPjmApi(path, body) {
 
   return res.json();
 }
-
-
 
 // ===================== ROUTES ADMIN KITS =====================
 
@@ -242,12 +246,10 @@ app.get('/admin/kits', async (req, res) => {
   }
 
   try {
-    // On réutilise la logique d’onglet + en-têtes
     const sheetName = email;
-    await ensureSheetExists(sheetName); // ta fonction existe déjà plus haut
+    await ensureSheetExists(sheetName);
 
-    // ⚠️ adapte la plage en fonction de ton nombre de colonnes
-    // Ici A → S (19 colonnes, index 0..18)
+    // A → S (19 colonnes)
     const range = `'${sheetName}'!A2:S`;
 
     const resp = await sheets.spreadsheets.values.get({
@@ -258,33 +260,33 @@ app.get('/admin/kits', async (req, res) => {
     const rows = resp.data.values || [];
 
     const kits = rows
-      .filter(r => r && r.length > 0)
+      .filter((r) => r && r.length > 0)
       .map((row, index) => {
         return {
           // Infos techniques
-          rowIndex: index + 2,           // ligne dans Google Sheet
+          rowIndex: index + 2, // ligne dans Google Sheet
           sheetName,
 
           // Mapping colonnes (ordre = header que tu as défini)
-          kitId:                row[0]  || '',
-          kitName:              row[1]  || '',
-          imageUrl:             row[2]  || '',
-          defaultQtyLivret:     row[3]  || '',
-          defaultQtyPochette:   row[4]  || '',
-          defaultQtyPatron:     row[5]  || '',
-          nombrePagesLivret:    row[6]  || '',
-          typeLivret:           row[7]  || '',
-          typeImpressionCouv:   row[8]  || '',
-          typeImpressionCorps:  row[9]  || '',
-          papierCouverture:     row[10] || '',
-          papierCorps:          row[11] || '',
-          formatFermeLivret:    row[12] || '',
-          pochette:             row[13] || '',
-          miseEnPochette:       row[14] || '',
-          patronM2:             row[15] || '',
-          impressionPatron:     row[16] || '',
-          activeRaw:            row[17] || '',
-          pjmOptionsJson:       row[18] || ''
+          kitId: row[0] || '',
+          kitName: row[1] || '',
+          imageUrl: row[2] || '',
+          defaultQtyLivret: row[3] || '',
+          defaultQtyPochette: row[4] || '',
+          defaultQtyPatron: row[5] || '',
+          nombrePagesLivret: row[6] || '',
+          typeLivret: row[7] || '',
+          typeImpressionCouv: row[8] || '',
+          typeImpressionCorps: row[9] || '',
+          papierCouverture: row[10] || '',
+          papierCorps: row[11] || '',
+          formatFermeLivret: row[12] || '',
+          pochette: row[13] || '',
+          miseEnPochette: row[14] || '',
+          patronM2: row[15] || '',
+          impressionPatron: row[16] || '',
+          activeRaw: row[17] || '',
+          pjmOptionsJson: row[18] || ''
         };
       });
 
@@ -332,13 +334,9 @@ app.post('/admin/kits/save', express.json(), async (req, res) => {
     const rows = response.data.values || [];
 
     // On cherche si une ligne a déjà ce KitId
-    let rowIndex = null; // index réel dans le sheet (2,3,4… car A2 = 2)
+    let rowIndex = null;
     rows.forEach((row, idx) => {
-      if (
-        row &&
-        row[0] &&
-        row[0].toString().trim() === finalKitId
-      ) {
+      if (row && row[0] && row[0].toString().trim() === finalKitId) {
         rowIndex = idx + 2; // +2 car le premier data row est A2
       }
     });
@@ -413,13 +411,11 @@ app.post('/admin/kits/save', express.json(), async (req, res) => {
 // - Récupère la liste des options pour un moteur PJM
 app.get('/admin/pjm/options', async (req, res) => {
   try {
-    const engineId = (req.query.engineId || PJM_ENGINE_INTEGRATION_ID || '').trim();
+    const engineId = (req.query.engineId || PJM_ENGINE_PRODUCT_ID || '').trim();
     if (!engineId) {
       return res.status(400).json({ error: 'Missing engineId' });
     }
 
-    // ⚠️ Adaptation à TON appel PJM réel :
-    // Ici on part sur un appel "details" avec Operation: "options"
     const payload = {
       Operation: 'options',
       Product: engineId,
@@ -428,7 +424,6 @@ app.get('/admin/pjm/options', async (req, res) => {
 
     const data = await callPjmApi('/public/engine', payload);
 
-    // On renvoie la payload brute, mais surtout data.Options
     return res.json({
       ok: true,
       engineId,
@@ -445,28 +440,12 @@ app.get('/admin/pjm/options', async (req, res) => {
 });
 
 /**
- * Transforme les selections simplifiées
- *   [{ optionId, key, value }, ...]
- * en tableau Options au format attendu par PJM.
- *
- * - Pour les listes déroulantes : key === "value" → on met .Value
- * - Pour les champs libres (quantités, etc.) : key (souvent "default") → Settings[]
- */
-/**
- * Transforme les selections simplifiées
- *   [{ optionId, key, value, label }, ...]
- * en tableau Options au format attendu par PJM.
- *
- * - Pour les listes déroulantes : on met dans Options[{ Key, Value }]
- * - Pour les champs libres (quantités, etc.) : on met dans Settings[{ Key, Value }]
- */
-/**
  * Transforme les selections (optionId, key, value, label) venant du front
  * en tableau Options pour l'API PJM.
  *
  * On envoie le même format que sur le projet "PJM + IA" :
  *   Options: [ { Key: optionId, Value: value }, ... ]
- * où "Key" = Id de l'option PJM.
+ * où "Key" = Id de l’option PJM.
  */
 function buildPjmOptionsFromSelections(selections) {
   if (!Array.isArray(selections)) return [];
@@ -484,20 +463,14 @@ function buildPjmOptionsFromSelections(selections) {
     }
 
     optionsArray.push({
-      Key: optId,             // Id de l’option PJM
-      Value: String(val)      // valeur choisie (souvent un GUID)
+      Key: optId, // Id de l’option PJM
+      Value: String(val) // valeur choisie (souvent un GUID)
     });
   });
 
   return optionsArray;
 }
 
-
-
-
-// ===================== ADMIN - OPTIONS + PRIX PJM =====================
-// On envoie à cette route un tableau "selections" simplifié :
-// Body: { engineId?: string, selections?: [ { optionId, key, value } ] }
 // ===================== ADMIN - OPTIONS + PRIX PJM =====================
 // Body: { engineId?: string, selections?: [ { optionId, key, value, label } ] }
 app.post('/admin/pjm/optionsandprice', async (req, res) => {
@@ -506,38 +479,48 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
       ? req.body.selections
       : [];
 
-    const engineId = PJM_ENGINE_INTEGRATION_ID;
+    const engineId = PJM_ENGINE_PRODUCT_ID;
     if (!engineId) {
-      return res.status(500).json({ error: 'PJM_ENGINE_INTEGRATION_ID manquant côté serveur' });
+      return res
+        .status(500)
+        .json({ error: 'PJM_ENGINE_PRODUCT_ID manquant côté serveur' });
     }
 
-    // 👉 nouvelle construction des options pour PJM
-const optionsForPjm = buildPjmOptionsFromSelections(selections);
+    // 👉 construction des options pour PJM
+    const optionsForPjm = buildPjmOptionsFromSelections(selections);
 
-const enginePayload = {
-  Operation: 'optionsandprice',
-  Product: engineId,
-  Options: optionsForPjm
-};
+    const enginePayload = {
+      Operation: 'optionsandprice',
+      Product: engineId,
+      Options: optionsForPjm
+    };
 
-console.log('[PJM] Payload envoyé à /public/engine :', enginePayload);
+    console.log('[PJM] Payload envoyé à /public/engine :', enginePayload);
 
-// 🔹 on utilise le helper générique qui gère déjà le token et les erreurs
-const data = await callPjmApi('/public/engine', enginePayload);
+    // 🔹 on utilise le helper générique
+    const data = await callPjmApi('/public/engine', enginePayload);
 
-res.json({
-  price: data.Price ?? null,
-  weight: data.Weight ?? null,
-  options: data.Options || [],
-  raw: data
+    return res.json({
+      price: data.Price ?? null,
+      weight: data.Weight ?? null,
+      options: data.Options || [],
+      raw: data
+    });
+  } catch (err) {
+    console.error('[PJM] Erreur /admin/pjm/optionsandprice', err);
+    return res.status(500).json({
+      error: 'Erreur interne',
+      details: err.message
+    });
+  }
 });
 
-
-// Endpoint de test
+// ===================== HEALTHCHECK =====================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', spreadsheetId: SPREADSHEET_ID });
 });
 
+// ===================== FRONT /kits POUR LA MODALE CLIENT =====================
 // GET /kits?email=...
 app.get('/kits', async (req, res) => {
   const email = (req.query.email || '').trim();
@@ -545,18 +528,12 @@ app.get('/kits', async (req, res) => {
     return res.status(400).json({ error: 'Missing email query parameter' });
   }
 
-  // Hypothèse actuelle : le nom de l’onglet = l’email du client
-  // (ex : onglet "client1@test.com"). On pourra faire un mapping plus tard.
   const sheetName = email;
-
-  // Plage : en-têtes en ligne 1, data à partir de A2:J (KitId .. Active)
   const range = `'${sheetName}'!A2:S`;
 
   try {
-    // Crée l'onglet + en-têtes s'il n'existe pas encore
     await ensureSheetExists(sheetName);
 
-    // Puis on lit les lignes de données
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -564,97 +541,102 @@ app.get('/kits', async (req, res) => {
 
     const rows = response.data.values || [];
 
-    // Map chaque ligne -> objet
     const kits = rows
-  .filter(row => row && row.length > 0)
-  .map(row => {
-    const [
-      kitId,
-      kitName,
-      imageUrl,
-      defaultQtyLivretRaw,
-      defaultQtyPochetteRaw,
-      defaultQtyPatronRaw,
-      nombrePagesLivret,
-      typeLivret,
-      typeImpressionCouverture,
-      typeImpressionCorps,
-      papierCouverture,
-      papierCorps,
-      formatFermeLivret,
-      pochette,
-      miseEnPochette,
-      patronM2,
-      impressionPatron,
-      activeFlag,
-      pjmOptionsJson
-    ] = row;
+      .filter((row) => row && row.length > 0)
+      .map((row) => {
+        const [
+          kitId,
+          kitName,
+          imageUrl,
+          defaultQtyLivretRaw,
+          defaultQtyPochetteRaw,
+          defaultQtyPatronRaw,
+          nombrePagesLivret,
+          typeLivret,
+          typeImpressionCouverture,
+          typeImpressionCorps,
+          papierCouverture,
+          papierCorps,
+          formatFermeLivret,
+          pochette,
+          miseEnPochette,
+          patronM2,
+          impressionPatron,
+          activeFlag,
+          pjmOptionsJson
+        ] = row;
 
-    const defaultQtyLivret   = parseNumberFromSheet(defaultQtyLivretRaw);
-    const defaultQtyPochette = parseNumberFromSheet(defaultQtyPochetteRaw);
-    const defaultQtyPatron   = parseNumberFromSheet(defaultQtyPatronRaw);
+        const defaultQtyLivret = parseNumberFromSheet(defaultQtyLivretRaw);
+        const defaultQtyPochette = parseNumberFromSheet(defaultQtyPochetteRaw);
+        const defaultQtyPatron = parseNumberFromSheet(defaultQtyPatronRaw);
 
-    // Par défaut : actif sauf si explicitement "non", "no", "0", "false"
-    const activeRaw = (activeFlag || '').toString().trim().toLowerCase();
-    const isActive = !['non', 'no', '0', 'false'].includes(activeRaw);
+        const activeRaw = (activeFlag || '')
+          .toString()
+          .trim()
+          .toLowerCase();
+        const isActive = !['non', 'no', '0', 'false'].includes(activeRaw);
 
-    // Parsing éventuel du JSON PJMOptionsJSON (facultatif pour l’instant)
-    let pjmOptions = null;
-    if (pjmOptionsJson && typeof pjmOptionsJson === 'string') {
-      try {
-        pjmOptions = JSON.parse(pjmOptionsJson);
-      } catch (e) {
-        console.warn('[KITS] PJMOptionsJSON invalide pour le kit', kitId, e.message);
-      }
-    }
+        let pjmOptions = null;
+        if (pjmOptionsJson && typeof pjmOptionsJson === 'string') {
+          try {
+            pjmOptions = JSON.parse(pjmOptionsJson);
+          } catch (e) {
+            console.warn(
+              '[KITS] PJMOptionsJSON invalide pour le kit',
+              kitId,
+              e.message
+            );
+          }
+        }
 
-    return {
-      kitId: kitId || '',
-      name: kitName || '',
-      imageUrl: imageUrl || '',
-      defaultQtyLivret,
-      defaultQtyPochette,
-      defaultQtyPatron,
+        return {
+          kitId: kitId || '',
+          name: kitName || '',
+          imageUrl: imageUrl || '',
+          defaultQtyLivret,
+          defaultQtyPochette,
+          defaultQtyPatron,
 
-      // Placeholders pour l’UI actuelle (on mettra le vrai prix via PJM plus tard)
-      priceLivret: 0,
-      pricePochette: 0,
-      pricePatron: 0,
+          // Placeholders pour l’UI (prix calculés plus tard si besoin)
+          priceLivret: 0,
+          pricePochette: 0,
+          pricePatron: 0,
 
-      active: isActive,
+          active: isActive,
 
-      // On garde toute la config métier accessible si on en a besoin plus tard
-      config: {
-        nombrePagesLivret: nombrePagesLivret || '',
-        typeLivret: typeLivret || '',
-        typeImpressionCouverture: typeImpressionCouverture || '',
-        typeImpressionCorps: typeImpressionCorps || '',
-        papierCouverture: papierCouverture || '',
-        papierCorps: papierCorps || '',
-        formatFermeLivret: formatFermeLivret || '',
-        pochette: pochette || '',
-        miseEnPochette: miseEnPochette || '',
-        patronM2: patronM2 || '',
-        impressionPatron: impressionPatron || ''
-      },
+          config: {
+            nombrePagesLivret: nombrePagesLivret || '',
+            typeLivret: typeLivret || '',
+            typeImpressionCouverture: typeImpressionCouverture || '',
+            typeImpressionCorps: typeImpressionCorps || '',
+            papierCouverture: papierCouverture || '',
+            papierCorps: papierCorps || '',
+            formatFermeLivret: formatFermeLivret || '',
+            pochette: pochette || '',
+            miseEnPochette: miseEnPochette || '',
+            patronM2: patronM2 || '',
+            impressionPatron: impressionPatron || ''
+          },
 
-      pjmOptions
-    };
-  })
-  .filter(kit => kit.active);
+          pjmOptions
+        };
+      })
+      .filter((kit) => kit.active);
 
-
-    res.json({
+    return res.json({
       email,
       sheetName,
       count: kits.length,
       kits
     });
   } catch (err) {
-    console.error('❌ Erreur lors de la lecture du sheet pour', sheetName, err.message);
+    console.error(
+      '❌ Erreur lors de la lecture du sheet pour',
+      sheetName,
+      err.message
+    );
 
-    
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Error reading Google Sheet',
       details: err.message || String(err)
     });
@@ -664,3 +646,4 @@ app.get('/kits', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ kits-couture-api listening on port ${PORT}`);
 });
+
