@@ -435,6 +435,50 @@ app.get('/admin/pjm/options', async (req, res) => {
   }
 });
 
+// ===================== ADMIN - OPTIONS + PRIX PJM =====================
+// POST /admin/pjm/optionsandprice
+// Body: { engineId?: string, options?: [...] }
+// -> appelle PJM avec Operation: "optionsandprice"
+app.post('/admin/pjm/optionsandprice', async (req, res) => {
+  try {
+    const engineId = (req.body.engineId || PJM_ENGINE_INTEGRATION_ID || '').trim();
+    const options = Array.isArray(req.body.options) ? req.body.options : [];
+
+    if (!engineId) {
+      return res.status(400).json({ error: 'Missing engineId' });
+    }
+
+    const payload = {
+      Operation: 'optionsandprice',
+      Product: engineId,
+      Options: options
+    };
+
+    const data = await callPjmApi('/public/engine', payload);
+
+    // On essaie de deviner où est le prix (à ajuster si besoin)
+    const price =
+      (data.Price && (data.Price.Total || data.Price.total || data.Price.Price)) ||
+      data.PriceTotal ||
+      data.Price ||
+      null;
+
+    res.json({
+      ok: true,
+      engineId,
+      payloadSent: payload,
+      raw: data,
+      options: data.Options || data.options || [],
+      price
+    });
+  } catch (err) {
+    console.error('[ADMIN /admin/pjm/optionsandprice] Error:', err);
+    res.status(500).json({
+      error: 'Error loading PJM options & price',
+      details: err.message || String(err)
+    });
+  }
+});
 
 
 
