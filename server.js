@@ -7,16 +7,25 @@ const PORT = process.env.PORT || 3000;
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 const GOOGLE_SHEETS_SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 const SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-// === PJM CONFIG ===
-const PJM_BASE_URL = process.env.PJM_BASE_URL || '';
-const PJM_USERNAME = process.env.PJM_USERNAME || '';
-const PJM_PASSWORD = process.env.PJM_PASSWORD || '';
-const PJM_ENGINE_INTEGRATION_ID = process.env.PJM_ENGINE_INTEGRATION_ID || '';
+// ====== CONFIG PJM (auth dynamique) ======
+const PJM_API_BASE = process.env.PJM_API_BASE || 'https://ams.printjobmanager.com/api';
 
-let pjmTokenCache = {
+// Ces 2 (ou 3) variables doivent être définies dans Render
+const PJM_USERNAME = process.env.PJM_USERNAME;
+const PJM_PASSWORD = process.env.PJM_PASSWORD;
+
+// ID du moteur PJM (Product / IntegrationId) pour les kits couture
+const PJM_ENGINE_PRODUCT_ID =
+  process.env.PJM_ENGINE_PRODUCT_ID || '6b58e620-e943-4785-be35-88285a3bd42a';
+
+// Petit cache en mémoire pour le token PJM
+let pjmAuthCache = {
   token: null,
+  // timestamp en ms
   expiresAt: 0
 };
+
+
 
 
 if (!SPREADSHEET_ID) {
@@ -503,54 +512,25 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
     }
 
     // 👉 nouvelle construction des options pour PJM
-    const optionsForPjm = buildPjmOptionsFromSelections(selections);
+const optionsForPjm = buildPjmOptionsFromSelections(selections);
 
-    console.log('[PJM] Payload envoyé à /api/public/engine :', {
-      Operation: 'optionsandprice',
-      Product: engineId,
-      Options: optionsForPjm
-    });
+const enginePayload = {
+  Operation: 'optionsandprice',
+  Product: engineId,
+  Options: optionsForPjm
+};
 
-    const resp = await fetch(`${PJM_BASE_URL}/api/public/engine`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${PJM_API_TOKEN}`
-      },
-      body: JSON.stringify({
-        Operation: 'optionsandprice',
-        Product: engineId,
-        Options: optionsForPjm
-      })
-    });
+console.log('[PJM] Payload envoyé à /public/engine :', enginePayload);
 
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => '');
-      console.error('[PJM] Erreur optionsandprice', resp.status, txt);
-      return res.status(500).json({
-        error: 'Appel PJM optionsandprice échoué',
-        status: resp.status,
-        body: txt
-      });
-    }
+// 🔹 on utilise le helper générique qui gère déjà le token et les erreurs
+const data = await callPjmApi('/public/engine', enginePayload);
 
-    const data = await resp.json();
-
-    res.json({
-      price: data.Price ?? null,
-      weight: data.Weight ?? null,
-      options: data.Options || [],
-      raw: data
-    });
-  } catch (err) {
-    console.error('[PJM] Erreur /admin/pjm/optionsandprice', err);
-    res.status(500).json({ error: 'Erreur interne', details: err.message });
-  }
+res.json({
+  price: data.Price ?? null,
+  weight: data.Weight ?? null,
+  options: data.Options || [],
+  raw: data
 });
-
-
-
-
 
 
 // Endpoint de test
