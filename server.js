@@ -451,49 +451,38 @@ app.get('/admin/pjm/options', async (req, res) => {
  * - Pour les listes déroulantes : on met dans Options[{ Key, Value }]
  * - Pour les champs libres (quantités, etc.) : on met dans Settings[{ Key, Value }]
  */
+/**
+ * Transforme les selections (optionId, key, value, label) venant du front
+ * en tableau Options pour l'API PJM.
+ *
+ * On envoie le même format que sur le projet "PJM + IA" :
+ *   Options: [ { Key: optionId, Value: value }, ... ]
+ * où "Key" = Id de l'option PJM.
+ */
 function buildPjmOptionsFromSelections(selections) {
   if (!Array.isArray(selections)) return [];
 
-  const byId = {};
+  const optionsArray = [];
 
-  selections.forEach(sel => {
+  selections.forEach((sel) => {
     if (!sel || !sel.optionId) return;
 
-    const optId = String(sel.optionId);
-    let opt = byId[optId];
+    const optId = String(sel.optionId).trim();
+    const val = sel.value;
 
-    if (!opt) {
-      opt = {
-        Id: optId,
-        Options: [],
-        Settings: []
-      };
-      byId[optId] = opt;
+    if (val === undefined || val === null || String(val).trim() === '') {
+      return; // on n’envoie pas les champs vides
     }
 
-    const value = sel.value != null ? String(sel.value) : '';
-    if (!value) return;
-
-    const key = sel.key || 'value';
-    const label = (sel.label || '').toString();
-
-    // 🔹 Cas LISTE DÉROULANTE → Options[{ Key, Value }]
-    if (key === 'value') {
-      opt.Options = [{
-        Key: label,     // ex. "A5", "Couleur R/V", ...
-        Value: value    // ex. "cea401e8-6ccd-4ff7-a27f-294fae847f70"
-      }];
-    } else {
-      // 🔹 Cas champ libre → Settings[{ Key, Value }]
-      opt.Settings.push({
-        Key: key,       // ex. "default"
-        Value: value    // ex. "0", "100", etc.
-      });
-    }
+    optionsArray.push({
+      Key: optId,             // Id de l’option PJM
+      Value: String(val)      // valeur choisie (souvent un GUID)
+    });
   });
 
-  return Object.values(byId);
+  return optionsArray;
 }
+
 
 
 
@@ -504,35 +493,35 @@ function buildPjmOptionsFromSelections(selections) {
 // Body: { engineId?: string, selections?: [ { optionId, key, value, label } ] }
 app.post('/admin/pjm/optionsandprice', async (req, res) => {
   try {
-    const engineId = (req.body.engineId || PJM_ENGINE_INTEGRATION_ID || '').trim();
     const selections = Array.isArray(req.body.selections)
       ? req.body.selections
       : [];
 
+    const engineId = PJM_ENGINE_INTEGRATION_ID;
     if (!engineId) {
-      return res.status(400).json({ error: 'Missing engineId / PJM_ENGINE_INTEGRATION_ID' });
+      return res.status(500).json({ error: 'PJM_ENGINE_INTEGRATION_ID manquant côté serveur' });
     }
 
-    // 🔹 On transforme les selections en Options au format PJM
+    // 👉 nouvelle construction des options pour PJM
     const optionsForPjm = buildPjmOptionsFromSelections(selections);
 
-    const payload = {
+    console.log('[PJM] Payload envoyé à /api/public/engine :', {
       Operation: 'optionsandprice',
       Product: engineId,
       Options: optionsForPjm
-    };
+    });
 
-    console.log('[PJM] Payload envoyé à /public/engine :', JSON.stringify(payload, null, 2));
-
-    const token = await getPjmToken();
-
-    const resp = await fetch(`${PJM_BASE_URL}/public/engine`, {
+    const resp = await fetch(`${PJM_BASE_URL}/api/public/engine`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${PJM_API_TOKEN}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        Operation: 'optionsandprice',
+        Product: engineId,
+        Options: optionsForPjm
+      })
     });
 
     if (!resp.ok) {
@@ -555,12 +544,10 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
     });
   } catch (err) {
     console.error('[PJM] Erreur /admin/pjm/optionsandprice', err);
-    res.status(500).json({
-      error: 'Erreur serveur /admin/pjm/optionsandprice',
-      details: err.message || String(err)
-    });
+    res.status(500).json({ error: 'Erreur interne', details: err.message });
   }
 });
+
 
 
 
