@@ -128,8 +128,8 @@ async function ensureSheetExists(sheetName) {
           'Active', // R
           'PJMOptionsJSON', // S
           'PresseroLivretJSON',      // T
-'PresseroPochetteJSON',    // U
-'PresseroPatronJSON'       // V
+          'PresseroPochetteJSON',    // U
+          'PresseroPatronJSON'       // V
         ]
       ]
     }
@@ -147,33 +147,36 @@ function parseNumberFromSheet(value) {
 }
 
 // Mapping objet kit -> ligne Google Sheet (19 colonnes A..S)
+// Mapping objet kit -> ligne Google Sheet (22 colonnes A:V)
+// Mapping objet kit -> ligne Google Sheet (22 colonnes A:V)
 function kitToRow(kit) {
   return [
-    kit.kitId || '', // A - KitId
-    kit.kitName || '', // B - KitName
-    kit.imageUrl || '', // C - ImageURL
-    kit.defaultQtyLivret || '', // D - DefaultQtyLivret
-    kit.defaultQtyPochette || '', // E - DefaultQtyPochette
-    kit.defaultQtyPatron || '', // F - DefaultQtyPatron
-    kit.nombrePagesLivret || '', // G - NombrePagesLivret
-    kit.typeLivret || '', // H - TypeLivret
-    kit.typeImpressionCouverture || '', // I - TypeImpressionCouverture
-    kit.typeImpressionCorps || '', // J - TypeImpressionCorps
-    kit.papierCouverture || '', // K - PapierCouverture
-    kit.papierCorps || '', // L - PapierCorps
-    kit.formatFermeLivret || '', // M - FormatFermeLivret
-    kit.pochette || '', // N - Pochette
-    kit.miseEnPochette || '', // O - MiseEnPochette
-    kit.patronM2 || '', // P - PatronM2
-    kit.impressionPatron || '', // Q - ImpressionPatron
-    kit.active ? 'Oui' : 'Non', // R - Active
-    kit.pjmOptionsJson || '' // S - PJMOptionsJSON
-    presseroLivretJson: body.presseroLivretJson || '',
-presseroPochetteJson: body.presseroPochetteJson || '',
-presseroPatronJson: body.presseroPatronJson || ''
-
+    kit.kitId || '',                // A
+    kit.kitName || '',              // B
+    kit.imageUrl || '',             // C
+    kit.defaultQtyLivret || '',      // D
+    kit.defaultQtyPochette || '',    // E
+    kit.defaultQtyPatron || '',      // F
+    kit.nombrePagesLivret || '',     // G
+    kit.typeLivret || '',           // H
+    kit.typeImpressionCouverture || '', // I
+    kit.typeImpressionCorps || '',      // J
+    kit.papierCouverture || '',      // K
+    kit.papierCorps || '',           // L
+    kit.formatFermeLivret || '',     // M
+    kit.pochette || '',              // N
+    kit.miseEnPochette || '',        // O
+    kit.patronM2 || '',              // P
+    kit.impressionPatron || '',      // Q
+    kit.active ? 'Oui' : 'Non',      // R
+    kit.pjmOptionsJson || '',        // S
+    kit.presseroLivretJson || '',    // T
+    kit.presseroPochetteJson || '',  // U
+    kit.presseroPatronJson || ''     // V
   ];
 }
+
+
 
 // ===================== HELPERS PJM (AUTH + APPEL) =====================
 
@@ -293,7 +296,7 @@ app.get('/admin/kits', async (req, res) => {
           patronM2: row[15] || '',
           impressionPatron: row[16] || '',
           activeRaw: row[17] || '',
-          pjmOptionsJson: row[18] || ''
+          pjmOptionsJson: row[18] || '',
           presseroLivretJson: row[19] || '',
 presseroPochetteJson: row[20] || '',
 presseroPatronJson: row[21] || ''
@@ -375,7 +378,12 @@ app.post('/admin/kits/save', express.json(), async (req, res) => {
         body.active === true ||
         body.active === 'true' ||
         body.active === 'Oui',
-      pjmOptionsJson: body.pjmOptionsJson || body.PJMOptionsJSON || ''
+      pjmOptionsJson: body.pjmOptionsJson || body.PJMOptionsJSON || '',
+presseroLivretJson: body.presseroLivretJson || body.PresseroLivretJSON || '',
+presseroPochetteJson: body.presseroPochetteJson || body.PresseroPochetteJSON || '',
+presseroPatronJson: body.presseroPatronJson || body.PresseroPatronJSON || ''
+
+
     };
 
     const rowValues = [kitToRow(kit)];
