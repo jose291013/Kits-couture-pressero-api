@@ -39,14 +39,24 @@ if (!SERVICE_ACCOUNT_KEY) {
 // On parse le JSON du compte de service
 let creds;
 try {
-  creds = JSON.parse(SERVICE_ACCOUNT_KEY);
+  const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_B64;
+
+  if (b64 && b64.trim()) {
+    const jsonStr = Buffer.from(b64, 'base64').toString('utf8');
+    creds = JSON.parse(jsonStr);
+  } else {
+    creds = JSON.parse(SERVICE_ACCOUNT_KEY);
+  }
 } catch (err) {
-  console.error('❌ Impossible de parser GOOGLE_SERVICE_ACCOUNT_KEY comme JSON :', err);
+  console.error('❌ Impossible de parser la clé Google (JSON/B64) :', err);
   process.exit(1);
 }
 
 // Certains hébergeurs stockent la clé privée avec les "\n" échappés
-const privateKey = creds.private_key.replace(/\\n/g, '\n');
+const privateKey =
+  (creds.private_key || '').includes('\\n')
+    ? creds.private_key.replace(/\\n/g, '\n')
+    : creds.private_key;
 
 // Auth Google
 const auth = new google.auth.JWT(
@@ -56,6 +66,7 @@ const auth = new google.auth.JWT(
   ['https://www.googleapis.com/auth/spreadsheets']
 );
 const sheets = google.sheets({ version: 'v4', auth });
+
 
 // ====== EXPRESS APP ======
 const app = express();
