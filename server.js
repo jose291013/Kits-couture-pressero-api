@@ -757,6 +757,10 @@ app.get('/kits', async (req, res) => {
           defaultQtyLivret,
           defaultQtyPochette,
           defaultQtyPatron,
+          presseroLivretJson: presseroLivretJson || '',
+          presseroPochetteJson: presseroPochetteJson || '',
+          presseroPatronJson: presseroPatronJson || '',
+          
 
           // Placeholders pour l’UI (prix calculés plus tard si besoin)
           priceLivret: 0,
@@ -778,6 +782,7 @@ app.get('/kits', async (req, res) => {
             patronM2: patronM2 || '',
             impressionPatron: impressionPatron || ''
           },
+          
 
           pjmOptions
         };
