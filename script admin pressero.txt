@@ -1,0 +1,955 @@
+<div class="kits-admin-page">
+  <h1>admin des kit coutures</h1>
+
+  <!-- Formulaire email -->
+  <form class="kits-admin-email-form">
+    <div class="field-row">
+      <div>
+        <label for="clientEmail">Email du client</label>
+        <input type="email" id="clientEmail" required placeholder="client@example.com" />
+      </div>
+
+      <!-- IMPORTANT : id="loadKitsBtn" -->
+      <button type="button" id="loadKitsBtn" class="btn btn-primary">Charger les kits</button>
+    </div>
+  </form>
+
+  <!-- Section liste des kits -->
+  <section id="kitsSection" class="hidden">
+    <div class="kits-header">
+      <h2>Kits pour <span id="clientEmailLabel"></span></h2>
+      <button type="button" id="newKitBtn" class="btn btn-secondary">+ Nouveau kit</button>
+    </div>
+
+    <div class="kits-table-wrapper">
+      <table id="kitsTable" class="kits-table">
+        <thead>
+          <tr>
+            <th>Actions</th>
+            <th>Nom du kit</th>
+            <th>KitId</th>
+            <th>Actif</th>
+            <th>Ordre</th>
+            <th>Créé le</th>
+            <th>Mis à jour le</th>
+          </tr>
+        </thead>
+        <tbody id="kitsTableBody">
+          <!-- lignes dynamiques -->
+        </tbody>
+      </table>
+    </div>
+
+    <div id="kitsStatus" class="status-bar"></div>
+  </section>
+</div>
+
+<!-- Modale admin pour créer / éditer un kit -->
+<div id="kitAdminModalBackdrop" class="kits-admin-modal-backdrop hidden">
+  <div class="kits-admin-modal">
+    <div class="kits-admin-modal-header">
+      <h3 id="kitAdminModalTitle">Nouveau kit</h3>
+      <button type="button" id="kitAdminModalClose" class="kits-admin-modal-close">×</button>
+    </div>
+
+    <div class="kits-admin-modal-body">
+      <div class="kits-admin-grid">
+        <!-- Colonne gauche : infos de base -->
+        <div class="kits-admin-panel">
+          <h4>Informations du kit</h4>
+
+          <div class="field-row-column">
+            <label for="kitAdminName">Nom du kit</label>
+            <input type="text" id="kitAdminName" placeholder="Ex : Sophie" />
+          </div>
+
+          <div class="field-row-column">
+            <label for="kitAdminImageUrl">URL image (optionnel)</label>
+            <input type="text" id="kitAdminImageUrl" placeholder="https://..." />
+          </div>
+
+          <div class="field-row-triple">
+            <div>
+              <label for="kitAdminQtyLivret">Qté livret par défaut</label>
+              <input type="number" id="kitAdminQtyLivret" min="0" step="1" />
+            </div>
+            <div>
+              <label for="kitAdminQtyPochette">Qté pochette par défaut</label>
+              <input type="number" id="kitAdminQtyPochette" min="0" step="1" />
+            </div>
+            <div>
+              <label for="kitAdminQtyPatron">Qté patron par défaut</label>
+              <input type="number" id="kitAdminQtyPatron" min="0" step="1" />
+            </div>
+          </div>
+
+          <div class="field-row-column">
+            <label>
+              <input type="checkbox" id="kitAdminActive" checked />
+              Actif (visible dans la modale de commande)
+            </label>
+          </div>
+        </div>
+
+        <!-- Colonne droite : JSON PJM -->
+        <div class="kits-admin-panel">
+          <h4>Configuration PJM (JSON)</h4>
+          <p class="small">
+            On stocke ici un JSON compact des sélections PJM (<code>selections</code>).
+          </p>
+
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+            <button type="button" id="kitAdminLoadPjmOptions" class="btn btn-secondary">
+              Charger options PJM
+            </button>
+            <span class="small">Utilise le moteur défini côté serveur (<code>PJM_ENGINE_INTEGRATION_ID</code>).</span>
+          </div>
+
+          <textarea
+            id="kitAdminPjmOptions"
+            rows="12"
+            placeholder='{
+  "selections": [
+    { "optionId": "...", "key": "...", "value": "..." }
+  ]
+}'
+          ></textarea>
+
+          <p class="small" style="margin-top:6px;">
+            Prix PJM estimé : <strong><span id="kitAdminPjmPrice">—</span></strong>
+          </p>
+        </div>
+
+        <!-- Nouveau panneau : configurateur visuel PJM -->
+        <div class="kits-admin-panel">
+          <h4>Configurateur PJM (beta)</h4>
+          <p class="small">
+            Choisis la configuration du kit via les options PJM ci-dessous.
+            On sauvegarde seulement les sélections dans <code>PJMOptionsJSON</code>.
+          </p>
+          <div id="kitAdminPjmConfigurator" class="pjm-configurator"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kits-admin-modal-footer">
+      <button type="button" id="kitAdminModalCancel" class="btn btn-secondary">Annuler</button>
+      <button type="button" id="kitAdminModalSave" class="btn btn-primary">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hidden { display:none; }
+  .kits-admin-page {
+    max-width: 960px;
+    margin: 20px auto 40px;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: 0 12px 25px rgba(15,23,42,0.08);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .kits-admin-page h1 { margin-top: 0; margin-bottom: 16px; }
+  .kits-admin-email-form .field-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+  .kits-admin-email-form label { display:block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  #clientEmail { width: 100%; border-radius: 999px; border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; }
+  .kits-header { display:flex; justify-content: space-between; align-items:center; margin-bottom: 12px; }
+  .kits-table-wrapper { border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
+  .kits-table { width:100%; border-collapse:collapse; font-size: 13px; }
+  .kits-table th, .kits-table td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align:left; }
+  .kits-table thead th { background:#f3f4f6; font-weight:600; }
+
+  .status-bar { margin-top: 10px; font-size: 13px; }
+  .status-bar.success { color:#166534; }
+  .status-bar.error { color:#b91c1c; }
+  .status-bar.info { color:#1d4ed8; }
+
+  .kits-admin-modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  .kits-admin-modal {
+    background: #fff;
+    max-width: 980px;
+    width: 95%;
+    max-height: 90vh;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.35);
+    display: flex;
+    flex-direction: column;
+  }
+  .kits-admin-modal-header, .kits-admin-modal-footer {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .kits-admin-modal-footer {
+    border-top: 1px solid #e5e7eb;
+    border-bottom: none;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .kits-admin-modal-body { padding: 16px; overflow-y: auto; }
+  .kits-admin-modal-close { border: none; background: none; font-size: 24px; cursor: pointer; }
+
+  .kits-admin-grid { display: grid; grid-template-columns: 1.1fr 1.2fr; gap: 16px; }
+  .kits-admin-panel { border-radius: 12px; border: 1px solid #e5e7eb; padding: 12px; background: #f9fafb; }
+  .field-row-column { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .field-row-triple { display: flex; gap: 8px; margin-bottom: 8px; }
+  .field-row-triple > div { flex: 1; }
+
+  .kits-admin-panel input[type="text"],
+  .kits-admin-panel input[type="number"],
+  .kits-admin-panel textarea,
+  .kits-admin-panel select {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    font-size: 13px;
+    background: #fff;
+  }
+
+  .kits-admin-panel textarea { resize: vertical; }
+  .small { font-size: 12px; color: #6b7280; }
+
+  /* configurateur */
+  .pjm-configurator {
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px dashed #cbd5e1;
+    background: #fff;
+  }
+</style>
+
+<script>
+  (function () {
+    // URL de ton serveur Render
+    var API_BASE = 'https://kits-couture-api.onrender.com';
+
+    var currentEmail = '';
+    var currentKits = [];
+    var editingKitId = null;
+    var domGlobal = null;
+
+    // État courant des options PJM
+    var currentPjmOptions = [];
+    var pjmAutoRefreshTimer = null;
+
+    // ---------- Helpers simples ----------
+    function isTruthyOui(v) {
+      return v === true || v === 'Oui' || v === 'oui' || v === 'OUI';
+    }
+
+    function safeTrim(v) {
+      return (v == null ? '' : String(v)).trim();
+    }
+
+    function setStatus(statusEl, msg, type) {
+      if (!statusEl) return;
+      statusEl.textContent = msg || '';
+      statusEl.className = 'status-bar';
+      if (type) statusEl.classList.add(type);
+    }
+
+    // ---------- Rendu du tableau de kits ----------
+    function renderKitsTable(tbody, kits) {
+      tbody.innerHTML = '';
+
+      if (!kits || !kits.length) {
+        var trEmpty = document.createElement('tr');
+        var tdEmpty = document.createElement('td');
+        tdEmpty.colSpan = 7;
+        tdEmpty.textContent = 'Aucun kit enregistré pour ce client.';
+        tdEmpty.style.textAlign = 'center';
+        trEmpty.appendChild(tdEmpty);
+        tbody.appendChild(trEmpty);
+        return;
+      }
+
+      kits.forEach(function (kit, index) {
+        var kitId = kit.KitId || kit.kitId || kit.id || ('KIT-' + (index + 1));
+        var name =
+          kit.KitName || kit.kitName || kit.name || ('Kit ' + (index + 1));
+        var active = isTruthyOui(kit.Active) || isTruthyOui(kit.active);
+        var sortOrder = kit.SortOrder || kit.sortOrder || index + 1;
+        var createdAt = kit.CreatedAt || kit.createdAt || '';
+        var updatedAt = kit.UpdatedAt || kit.updatedAt || '';
+
+        var tr = document.createElement('tr');
+
+        // Col 1: bouton Edit
+        var tdBtn = document.createElement('td');
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-secondary kits-edit-btn';
+        btn.setAttribute('data-kit-id', kitId);
+        btn.textContent = 'Éditer';
+        tdBtn.appendChild(btn);
+        tr.appendChild(tdBtn);
+
+        // Col 2..7
+        var tdName = document.createElement('td');
+        tdName.textContent = name;
+        tr.appendChild(tdName);
+
+        var tdId = document.createElement('td');
+        tdId.textContent = kitId;
+        tr.appendChild(tdId);
+
+        var tdActive = document.createElement('td');
+        tdActive.textContent = active ? 'Oui' : 'Non';
+        tr.appendChild(tdActive);
+
+        var tdSort = document.createElement('td');
+        tdSort.textContent = sortOrder;
+        tr.appendChild(tdSort);
+
+        var tdCreated = document.createElement('td');
+        tdCreated.textContent = createdAt || '-';
+        tr.appendChild(tdCreated);
+
+        var tdUpdated = document.createElement('td');
+        tdUpdated.textContent = updatedAt || '-';
+        tr.appendChild(tdUpdated);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ---------- Chargement des kits pour un email ----------
+    function loadKitsForEmail(email, dom) {
+      var status = dom.status;
+      var tbody = dom.tbody;
+      var section = dom.section;
+      var emailLabel = dom.emailLabel;
+
+      if (!email) return;
+
+      console.log('[KITS ADMIN] fetch /admin/kits pour', email);
+      setStatus(status, 'Chargement des kits…', 'info');
+
+      fetch(API_BASE + '/admin/kits?email=' + encodeURIComponent(email))
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          var kits = (data && data.kits) || [];
+          console.log('[KITS ADMIN] Réponse /admin/kits', data);
+
+          currentEmail = email;
+          currentKits = kits;
+
+          renderKitsTable(tbody, kits);
+
+          if (section) section.classList.remove('hidden');
+          if (emailLabel) emailLabel.textContent = email;
+
+          setStatus(status, kits.length + ' kit(s) chargé(s).', 'success');
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur API /admin/kits :', err);
+          setStatus(
+            status,
+            'Erreur lors du chargement des kits : ' + err.message,
+            'error'
+          );
+        });
+    }
+
+    // ---------- DOM de la modale ----------
+    function getModalDom() {
+      return {
+        backdrop: document.getElementById('kitAdminModalBackdrop'),
+        title: document.getElementById('kitAdminModalTitle'),
+
+        nameInput: document.getElementById('kitAdminName'),
+        imageInput: document.getElementById('kitAdminImageUrl'),
+
+        qtyLivret: document.getElementById('kitAdminQtyLivret'),
+        qtyPochette: document.getElementById('kitAdminQtyPochette'),
+        qtyPatron: document.getElementById('kitAdminQtyPatron'),
+
+        activeCheckbox: document.getElementById('kitAdminActive'),
+        pjmTextarea: document.getElementById('kitAdminPjmOptions'),
+
+        pjmPriceLabel: document.getElementById('kitAdminPjmPrice'),
+        pjmConfigurator: document.getElementById('kitAdminPjmConfigurator'),
+
+        btnClose: document.getElementById('kitAdminModalClose'),
+        btnCancel: document.getElementById('kitAdminModalCancel'),
+        btnSave: document.getElementById('kitAdminModalSave'),
+        btnLoadPjm: document.getElementById('kitAdminLoadPjmOptions')
+      };
+    }
+
+    // ---------- JSON PJM : selections ----------
+    function getSelectionsFromJsonTextarea(m) {
+      if (!m || !m.pjmTextarea || !m.pjmTextarea.value.trim()) return [];
+      try {
+        var parsed = JSON.parse(m.pjmTextarea.value);
+        if (parsed && Array.isArray(parsed.selections)) {
+          return parsed.selections;
+        }
+      } catch (e) {
+        console.warn('[KITS ADMIN] PJMOptionsJSON invalide, on l’ignore.', e);
+      }
+      return [];
+    }
+
+    // Construit des selections à partir des options PJM brutes
+    function buildSelectionsFromPjmOptions(options) {
+      var selections = [];
+      if (!Array.isArray(options)) return selections;
+
+      options.forEach(function (opt) {
+        var optId = opt.Id || opt.id || '';
+        if (!optId) return;
+
+        var values = opt.Options || opt.options || [];
+        var settings = opt.Settings || opt.settings || [];
+        var firstSetting = settings[0] || null;
+
+        if (!Array.isArray(values) || values.length === 0) {
+          // Champ texte / numérique
+          var key = firstSetting ? String(firstSetting.Key || 'default') : 'default';
+          var value =
+            firstSetting && firstSetting.Value != null
+              ? String(firstSetting.Value)
+              : '';
+          selections.push({
+            optionId: optId,
+            key: key,
+            value: value,
+            label: ''
+          });
+        } else {
+          // Liste déroulante
+          var defaultVal =
+            firstSetting && firstSetting.Value != null
+              ? String(firstSetting.Value)
+              : '';
+
+          var selectedOpt =
+            values.find(function (v) {
+              var vValue = v.Value || v.value || '';
+              return defaultVal && String(vValue) === defaultVal;
+            }) || values[0];
+
+          var value = defaultVal || String(selectedOpt.Value || selectedOpt.value || '');
+          var label =
+            selectedOpt.Key ||
+            selectedOpt.Label ||
+            selectedOpt.label ||
+            String(value);
+
+          selections.push({
+            optionId: optId,
+            key: 'value',   // pour les selects on envoie tjrs "value"
+            value: value,
+            label: String(label)
+          });
+        }
+      });
+
+      return selections;
+    }
+
+    // Lit les selections depuis le configurateur HTML
+    function getSelectionsFromConfigurator() {
+      var container = document.getElementById('kitAdminPjmConfigurator');
+      if (!container) return [];
+
+      var inputs = container.querySelectorAll('.pjm-option-input');
+      var selections = [];
+
+      inputs.forEach(function (el) {
+        var val = (el.value || '').trim();
+        if (!val && el.tagName === 'SELECT') {
+          // si rien de sélectionné sur un select, on n’envoie rien
+          return;
+        }
+
+        var optionId = el.getAttribute('data-option-id') || '';
+        var key = el.getAttribute('data-option-key') || '';
+        var labelAttr = el.getAttribute('data-option-label') || '';
+
+        if (!optionId || !key) return;
+
+        var label = labelAttr;
+
+        if (!label && el.tagName === 'SELECT') {
+          var opt = el.options[el.selectedIndex];
+          if (opt) label = opt.textContent.trim();
+        }
+
+        selections.push({
+          optionId: optionId,
+          key: key,
+          value: val,
+          label: label
+        });
+      });
+
+      return selections;
+    }
+
+    // ---------- Auto-refresh PJM quand on change une option ----------
+    function schedulePjmAutoRefresh() {
+      if (pjmAutoRefreshTimer) {
+        clearTimeout(pjmAutoRefreshTimer);
+      }
+
+      pjmAutoRefreshTimer = setTimeout(function () {
+        var m = getModalDom();
+
+        // 1) On lit d’abord le configurateur
+        var selections = getSelectionsFromConfigurator();
+
+        // 2) Si vide (cas initial), on retombe sur le JSON déjà stocké
+        if (!selections.length && m && m.pjmTextarea && m.pjmTextarea.value.trim()) {
+          selections = getSelectionsFromJsonTextarea(m);
+        }
+
+        // 3) Appel PJM options+price
+        callPjmOptionsAndPriceWithSelections(selections, m);
+      }, 400);
+    }
+
+    // ---------- Configurateur PJM visuel ----------
+    function renderPjmConfigurator(options, selections) {
+      var container = document.getElementById('kitAdminPjmConfigurator');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      if (!Array.isArray(options) || options.length === 0) {
+        container.innerHTML =
+          '<p class="small text-muted">Aucune option PJM disponible. Clique sur "Charger options PJM".</p>';
+        return;
+      }
+
+      // Index des selections pour pré-remplir
+      var selIndex = {};
+      (selections || []).forEach(function (sel) {
+        var k = sel.optionId + '::' + sel.key;
+        selIndex[k] = sel;
+      });
+
+      options.forEach(function (opt, idx) {
+        var optId = opt.Id || opt.id || ('opt-' + idx);
+        var label = opt.Label || opt.label || opt.Key || ('Option ' + (idx + 1));
+        var values = opt.Options || opt.options || [];
+        var settings = opt.Settings || opt.settings || [];
+        var firstSetting = settings[0] || null;
+
+        // clé "logique" pour stockage : pour un select on met "value", sinon on reprend Key
+        var settingKey = (Array.isArray(values) && values.length > 0)
+          ? 'value'
+          : (firstSetting ? String(firstSetting.Key || 'default') : 'default');
+
+        var selKey = optId + '::' + settingKey;
+        var selObj = selIndex[selKey];
+
+        var selectedVal = '';
+        if (selObj) {
+          selectedVal = selObj.value;
+        } else if (firstSetting && firstSetting.Value != null) {
+          selectedVal = String(firstSetting.Value);
+        }
+
+        var row = document.createElement('div');
+        row.className = 'pjm-option-row';
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.marginBottom = '6px';
+        row.style.gap = '8px';
+
+        var labelEl = document.createElement('label');
+        labelEl.textContent = label;
+        labelEl.style.minWidth = '220px';
+        labelEl.style.fontSize = '12px';
+        labelEl.style.color = '#4b5563';
+
+        row.appendChild(labelEl);
+
+        var inputEl;
+
+        if (Array.isArray(values) && values.length > 0) {
+          // Liste déroulante
+          inputEl = document.createElement('select');
+          inputEl.className = 'pjm-option-input form-control';
+          inputEl.style.maxWidth = '260px';
+
+          values.forEach(function (v) {
+            var vLabel = v.Key || v.Label || v.label || v.Value || v.value || '';
+            var vValue = v.Value || v.value || v.Key || vLabel;
+
+            var optDom = document.createElement('option');
+            optDom.value = String(vValue);
+            optDom.textContent = vLabel;
+
+            if (selectedVal && String(vValue) === selectedVal) {
+              optDom.selected = true;
+            }
+
+            inputEl.appendChild(optDom);
+          });
+
+          inputEl.setAttribute('data-option-key', 'value');
+        } else {
+          // Champ texte / numérique libre
+          inputEl = document.createElement('input');
+          inputEl.type = 'text';
+          inputEl.className = 'pjm-option-input form-control';
+          inputEl.style.maxWidth = '260px';
+          inputEl.value = selectedVal || '';
+
+          inputEl.setAttribute('data-option-key', settingKey);
+        }
+
+        inputEl.setAttribute('data-option-id', optId);
+
+        // Auto-refresh sur changement
+        inputEl.addEventListener('change', schedulePjmAutoRefresh);
+        if (inputEl.tagName === 'INPUT') {
+          inputEl.addEventListener('blur', schedulePjmAutoRefresh);
+        }
+
+        row.appendChild(inputEl);
+        container.appendChild(row);
+      });
+    }
+
+    // ---------- Appel /admin/pjm/optionsandprice ----------
+    function callPjmOptionsAndPriceWithSelections(selections, m) {
+  if (!m) m = getModalDom();
+
+  // On garde la sélection actuelle comme "source de vérité"
+  var baseSelections = Array.isArray(selections) ? selections : [];
+
+  var payload = {
+    selections: baseSelections
+  };
+
+  console.log('[KITS ADMIN] POST /admin/pjm/optionsandprice payload =', payload);
+
+  fetch(API_BASE + '/admin/pjm/optionsandprice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(function (res) {
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status);
+      }
+      return res.json();
+    })
+    .then(function (data) {
+      console.log('[KITS ADMIN] Réponse options+prix PJM', data);
+
+      var options =
+        (data && Array.isArray(data.options))
+          ? data.options
+          : data &&
+            data.raw &&
+            Array.isArray(data.raw.Options)
+          ? data.raw.Options
+          : [];
+
+      currentPjmOptions = options;
+
+      // ⚠️ Très important :
+      // - si on a déjà des selections (baseSelections), on les garde
+      // - sinon, on reconstruit à partir des defaults PJM
+      var newSelections =
+        baseSelections.length > 0
+          ? baseSelections
+          : buildSelectionsFromPjmOptions(options);
+
+      // On met à jour le configurateur AVEC les selections choisies
+      renderPjmConfigurator(options, newSelections);
+
+      // Et on met à jour le JSON sauvegardé avec ces mêmes selections
+      if (m.pjmTextarea) {
+        m.pjmTextarea.value = JSON.stringify(
+          { selections: newSelections },
+          null,
+          2
+        );
+      }
+
+      // Mise à jour du prix affiché
+      if (m.pjmPriceLabel) {
+        if (data.price != null) {
+          m.pjmPriceLabel.textContent = String(data.price);
+        } else if (data.raw && data.raw.Price) {
+          m.pjmPriceLabel.textContent = JSON.stringify(data.raw.Price);
+        } else {
+          m.pjmPriceLabel.textContent = '—';
+        }
+      }
+    })
+    .catch(function (err) {
+      console.error('[KITS ADMIN] Erreur /admin/pjm/optionsandprice :', err);
+      if (m.pjmPriceLabel) {
+        m.pjmPriceLabel.textContent = 'Erreur';
+      }
+    });
+}
+
+
+    // ---------- Ouverture / fermeture modale ----------
+    function openKitModal(mode, kit) {
+      var m = getModalDom();
+      if (!m.backdrop) return;
+
+      editingKitId = kit ? (kit.KitId || kit.kitId || kit.id || '') : null;
+
+      m.title.textContent = kit ? 'Éditer le kit' : 'Nouveau kit';
+
+      m.nameInput.value = safeTrim(kit && (kit.KitName || kit.kitName));
+      m.imageInput.value = safeTrim(kit && (kit.ImageURL || kit.imageUrl));
+
+      m.qtyLivret.value = safeTrim(
+        kit && (kit.DefaultQtyLivret || kit.defaultQtyLivret)
+      );
+      m.qtyPochette.value = safeTrim(
+        kit && (kit.DefaultQtyPochette || kit.defaultQtyPochette)
+      );
+      m.qtyPatron.value = safeTrim(
+        kit && (kit.DefaultQtyPatron || kit.defaultQtyPatron)
+      );
+
+      var isActive =
+        !kit || isTruthyOui(kit.Active) || isTruthyOui(kit.active);
+      m.activeCheckbox.checked = isActive;
+
+      // On remet le JSON sauvegardé dans la textarea
+      m.pjmTextarea.value = safeTrim(
+        kit && (kit.PJMOptionsJSON || kit.pjmOptionsJson)
+      );
+
+      if (m.pjmPriceLabel) m.pjmPriceLabel.textContent = '—';
+
+      // message de base dans le configurateur
+      if (m.pjmConfigurator) {
+        m.pjmConfigurator.innerHTML =
+          '<p class="small text-muted">Clique sur "Charger options PJM" pour initialiser ou recalculer la configuration.</p>';
+      }
+
+      // Si on a déjà un JSON avec des selections, on réhydrate directement PJM
+      var selectionsFromJson = getSelectionsFromJsonTextarea(m);
+      if (selectionsFromJson.length) {
+        callPjmOptionsAndPriceWithSelections(selectionsFromJson, m);
+      }
+
+      m.backdrop.classList.remove('hidden');
+    }
+
+    function closeKitModal() {
+      var m = getModalDom();
+      if (m.backdrop) m.backdrop.classList.add('hidden');
+      editingKitId = null;
+    }
+
+    // ---------- Sauvegarde depuis la modale ----------
+    function saveKitFromModal(dom) {
+      var m = getModalDom();
+
+      if (!currentEmail) {
+        alert('Aucun email client sélectionné.');
+        return;
+      }
+
+      // On synchronise d’abord le configurateur -> textarea JSON
+      var currentSelections = getSelectionsFromConfigurator();
+      if (currentSelections.length && m.pjmTextarea) {
+        m.pjmTextarea.value = JSON.stringify(
+          { selections: currentSelections },
+          null,
+          2
+        );
+      }
+
+      var payload = {
+        email: currentEmail,
+        kitId: editingKitId,
+        kitName: safeTrim(m.nameInput.value),
+        imageUrl: safeTrim(m.imageInput.value),
+        defaultQtyLivret: safeTrim(m.qtyLivret.value),
+        defaultQtyPochette: safeTrim(m.qtyPochette.value),
+        defaultQtyPatron: safeTrim(m.qtyPatron.value),
+        active: !!m.activeCheckbox.checked,
+        pjmOptionsJson: m.pjmTextarea.value || ''
+      };
+
+      console.log('[KITS ADMIN] Sauvegarde kit', payload);
+
+      fetch(API_BASE + '/admin/kits/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (res) {
+          if (!res.ok) {
+            return res
+              .json()
+              .catch(function () {
+                throw new Error('HTTP ' + res.status);
+              })
+              .then(function (errJson) {
+                throw new Error(errJson.error || 'HTTP ' + res.status);
+              });
+          }
+          return res.json();
+        })
+        .then(function (data) {
+          console.log('[KITS ADMIN] Kit sauvegardé', data);
+          closeKitModal();
+          if (domGlobal && currentEmail) {
+            loadKitsForEmail(currentEmail, domGlobal);
+          }
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur /admin/kits/save :', err);
+          alert('Erreur lors de la sauvegarde du kit : ' + err.message);
+        });
+    }
+
+    // ---------- Initialisation globale ----------
+    function initKitsAdmin() {
+      var emailInput = document.getElementById('clientEmail');
+      var loadBtn = document.getElementById('loadKitsBtn');
+      var tbody = document.getElementById('kitsTableBody');
+
+      var section = document.getElementById('kitsSection');
+      var emailLabel = document.getElementById('clientEmailLabel');
+      var status = document.getElementById('kitsStatus');
+      var newKitBtn = document.getElementById('newKitBtn');
+
+      if (!emailInput || !loadBtn || !tbody) {
+        console.warn('[KITS ADMIN] init : éléments manquants', {
+          emailInput: !!emailInput,
+          loadBtn: !!loadBtn,
+          tbody: !!tbody
+        });
+        return;
+      }
+
+      var dom = {
+        emailInput: emailInput,
+        loadBtn: loadBtn,
+        tbody: tbody,
+        section: section,
+        emailLabel: emailLabel,
+        status: status
+      };
+
+      domGlobal = dom;
+
+      // bouton "Charger les kits"
+      loadBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var email = emailInput.value.trim();
+        if (!email) {
+          emailInput.focus();
+          setStatus(status, 'Merci de saisir un email.', 'error');
+          return;
+        }
+        loadKitsForEmail(email, dom);
+      });
+
+      // Enter dans le champ email
+      emailInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          loadBtn.click();
+        }
+      });
+
+      // Nouveau kit
+      if (newKitBtn) {
+        newKitBtn.addEventListener('click', function () {
+          openKitModal('new', null);
+        });
+      }
+
+      // Clic sur "Éditer"
+      tbody.addEventListener('click', function (e) {
+        var btn = e.target.closest('.kits-edit-btn');
+        if (!btn) return;
+
+        var kitId = btn.getAttribute('data-kit-id');
+        if (!kitId) return;
+
+        var kit = currentKits.find(function (k) {
+          var id = k.KitId || k.kitId || k.id || '';
+          return String(id).trim() === String(kitId).trim();
+        });
+
+        openKitModal('edit', kit || null);
+      });
+
+      // Boutons modale
+      var m = getModalDom();
+
+      if (m.btnClose) m.btnClose.addEventListener('click', closeKitModal);
+      if (m.btnCancel) m.btnCancel.addEventListener('click', closeKitModal);
+
+      if (m.backdrop) {
+        m.backdrop.addEventListener('click', function (e) {
+          if (e.target === m.backdrop) closeKitModal();
+        });
+      }
+
+      if (m.btnSave) {
+        m.btnSave.addEventListener('click', function () {
+          saveKitFromModal(dom);
+        });
+      }
+
+      // Bouton "Charger options PJM" : priorité au JSON, sinon configurateur
+      if (m.btnLoadPjm) {
+        m.btnLoadPjm.addEventListener('click', function () {
+          console.log(
+            '[KITS ADMIN] Chargement / recalcul PJM (options+prix)…'
+          );
+
+          var selections = getSelectionsFromJsonTextarea(m);
+          if (!selections.length) {
+            selections = getSelectionsFromConfigurator();
+          }
+
+          callPjmOptionsAndPriceWithSelections(selections, m);
+        });
+      }
+
+      // Préremplir l’email depuis #correo si possible
+      try {
+        var correoDiv = document.getElementById('correo');
+        if (correoDiv && correoDiv.textContent.trim() && !emailInput.value) {
+          emailInput.value = correoDiv.textContent.trim();
+        }
+      } catch (e) {
+        console.warn('[KITS ADMIN] Impossible de lire #correo', e);
+      }
+
+      console.log('[KITS ADMIN] Initialisation terminée (front + édition).');
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initKitsAdmin);
+    } else {
+      initKitsAdmin();
+    }
+  })();
+</script>
+
+
+
+<div id="builder-content-end"></div>

@@ -1,0 +1,1716 @@
+<!-- Bouton pour ouvrir la modale -->
+ <!-- Bouton d’ouverture de la modale, visible tout de suite -->
+   <button id="openKitsModal"
+        type="button"
+        class="kits-btn-primary kits-open-btn">
+  Mes kits de couture
+</button>
+
+
+  
+<!-- Fond sombre de la modale -->
+<div id="kitsModalBackdrop" class="kits-modal-backdrop">
+  <div class="kits-modal">
+    <div class="kits-modal-header">
+      <h2>Mes kits de couture</h2>
+      <button type="button" id="closeKitsModal" class="kits-close-btn">&times;</button>
+    </div>
+
+        <!-- Corps scrollable -->
+    <div class="kits-body">
+      <!-- Toolbar -->
+      <div class="kits-toolbar">
+        <div class="kits-search-group">
+          <label>Búsqueda</label>
+          <input type="text" placeholder="Rechercher un kit…">
+        </div>
+      </div>
+      
+      <!-- Tableau -->
+      <div class="kits-table-wrapper">
+        <table class="kits-table">
+          <thead>
+  <tr class="kc-header-top">
+    <th>Image</th>
+    <th>Kit</th>
+    <th>Qté identique</th>
+
+    <!-- Bloc Livret -->
+    <th colspan="2" class="kc-col-group kc-col-livret">
+      <span class="kc-col-title">
+        <span class="kc-col-icon kc-col-icon-l">L</span> Livret
+      </span>
+    </th>
+
+    <!-- Bloc Pochette -->
+    <th colspan="2" class="kc-col-group kc-col-pochette">
+      <span class="kc-col-title">
+        <span class="kc-col-icon kc-col-icon-p">P</span> Pochette
+      </span>
+    </th>
+
+    <!-- Bloc Patron -->
+    <th colspan="2" class="kc-col-group kc-col-patron">
+      <span class="kc-col-title">
+        <span class="kc-col-icon kc-col-icon-t">T</span> Patron
+      </span>
+    </th>
+
+    <th rowspan="2">Mise à jour fichier</th>
+    <th colspan="2" class="kc-col-group kc-col-options">Options</th>
+  </tr>
+
+  <tr class="kc-header-bottom">
+    <!-- colonnes vides alignées avec Image/Kit -->
+    <th></th>
+    <th></th>
+    <th class="kc-qty-identique-label">Qté par composant</th>
+
+    <!-- sous-lignes Livret -->
+    <th>
+      <span
+        class="kc-th-label"
+        title="Minimum 10 livrets par ligne et 100 au total."
+      >
+        Qté livret
+      </span>
+    </th>
+    <th>Prix livret</th>
+
+    <!-- sous-lignes Pochette -->
+    <th>
+      <span
+        class="kc-th-label"
+        title="Minimum 10 pochettes par ligne et 100 au total."
+      >
+        Qté pochette
+      </span>
+    </th>
+    <th>Prix pochette</th>
+
+    <!-- sous-lignes Patron -->
+    <th>Qté patron</th>
+    <th>Prix patron</th>
+
+    <!-- Options -->
+    <th>
+  <span class="kc-col-title">
+    <span class="kc-col-icon kc-col-icon-pack">M</span> Mise en pochette
+  </span>
+</th>
+<th class="kc-th-stickers">
+  <span class="kc-col-title">
+    <span class="kc-col-icon kc-col-icon-stick">S</span> Pastille autocollante
+  </span>
+</th>
+
+
+  </tr>
+</thead>
+
+
+
+          <tbody id="kitsTableBody">
+  <tr class="kc-kit-row"
+    data-kit-id="SOPHIE-01"
+    data-kit-row="1"
+    data-price-livret="0"
+    data-price-pochette="0"
+    data-price-patron="0">
+
+    <!-- Image -->
+    <td class="kc-kit-image">
+      <!-- ton image -->
+      <div class="kc-image-placeholder"></div>
+    </td>
+
+    <!-- Nom du kit -->
+    <td class="kc-kit-name">Sophie</td>
+
+    <!-- Qté identique -->
+    <td class="kc-cell-identique">
+      <input
+        type="number"
+        class="kc-qty-identique kits-input-qte-identique"
+        min="0"
+        step="1"
+        value="20"
+      />
+    </td>
+
+    <!-- LIVRET : Qté + Prix -->
+    <td class="kc-cell-qty kc-cell-livret">
+      <input
+        type="number"
+       class="kc-qty-livret kits-input-qte-component"
+data-component="livret"
+        min="0"
+        step="1"
+        value="20"
+      />
+    </td>
+    <td class="kc-cell-price kc-cell-livret">
+      <span class="kc-price-livret">xx,xx €</span>
+    </td>
+
+    <!-- POCHETTE : Qté + Prix -->
+    <td class="kc-cell-qty kc-cell-pochette">
+      <input
+        type="number"
+       class="kc-qty-pochette kits-input-qte-component"
+ data-component="pochette"
+        min="0"
+        step="1"
+        value="20"
+      />
+    </td>
+    <td class="kc-cell-price kc-cell-pochette">
+      <span class="kc-price-pochette">xx,xx €</span>
+    </td>
+
+    <!-- PATRON : Qté + Prix -->
+    <td class="kc-cell-qty kc-cell-patron">
+      <input
+        type="number"
+        class="kc-qty-patron kits-input-qte-component"
+data-component="patron"
+        min="0"
+        step="1"
+        value="20"
+      />
+    </td>
+    <td class="kc-cell-price kc-cell-patron">
+      <span class="kc-price-patron">xx,xx €</span>
+    </td>
+
+    <!-- Mise à jour fichier -->
+    <td class="kc-cell-update">
+      <select class="kc-update-select">
+        <option value="Non">Non</option>
+        <option value="Oui">Oui</option>
+      </select>
+    </td>
+
+    <!-- Mise en pochette -->
+    <td class="kc-cell-mepochette">
+      <div class="kc-option-group kc-option-mepochette">
+        <select class="kc-mepochette-select">
+          <option value="Non">Non</option>
+          <option value="Oui">Oui</option>
+        </select>
+        <input
+          type="number"
+          class="kc-qty-mepochette"
+          min="0"
+          step="1"
+          placeholder="Qté"
+        />
+      </div>
+    </td>
+
+    <!-- Pastille autocollante -->
+    <td class="kc-cell-stickers">
+      <div class="kc-option-group kc-option-stickers">
+        <select class="kc-stickers-select">
+          <option value="Non">Non</option>
+          <option value="Oui">Oui</option>
+        </select>
+        <input
+          type="number"
+          class="kc-qty-stickers"
+          min="0"
+          step="1"
+          placeholder="Qté"
+        />
+      </div>
+    </td>
+  </tr>
+
+  <!-- ... autres lignes ... -->
+</tbody>
+
+        </table>
+      </div>
+
+      <!-- Section upload / commentaire réductible -->
+      <div id="kitsBottomSection" class="kits-bottom-section">
+        <button type="button" id="kitsBottomToggle" class="kits-bottom-toggle">
+          Options de fichiers & commentaire
+          <span id="kitsBottomToggleIcon" class="kits-bottom-toggle-icon" aria-hidden="true">▾</span>
+        </button>
+
+        <div id="kitsBottomGrid" class="kits-bottom-grid">
+          <!-- Upload / diffuseur -->
+          <div class="kits-box kits-box-upload" id="kitsUploadArea">
+  <div class="kits-upload-title">Téléchargez vos fichiers</div>
+  <div class="kits-upload-hint">Glissez-déposez ou cliquez ici</div>
+  <div class="kits-upload-filename" id="kitsUploadFilename"></div>
+  <button type="button" class="kits-upload-remove" id="kitsUploadRemove">
+    Supprimer le fichier
+  </button>
+</div>
+
+
+          <!-- Commentaire -->
+          <div class="kits-box kits-box-comment">
+            <label for="kitsComment" class="kits-comment-label">Commentaire</label>
+            <textarea id="kitsComment" class="kits-comment-textarea"
+                      placeholder="Ajoutez un commentaire pour cette commande…"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pied : message d’erreur + total + boutons -->
+    <div class="kits-footer-actions">
+      <div id="kitsError" class="kits-error" role="alert" aria-live="polite"></div>
+
+      <div class="kits-footer-row">
+        <div class="kits-total">
+          Total estimé : <span class="kits-total-value">xxx,xx&nbsp;€</span>
+        </div>
+        <button class="kits-btn-secondary" id="cancelKits">Annuler</button>
+        <button type="button" class="kits-btn-primary" id="kitsSendBtn">
+          Envoyer vers la commande
+        </button>
+      </div>
+    </div>
+</div>
+</div>
+  
+
+
+
+<style>
+.file-progress-actions .btn-progress-remove {
+  display: none !important;
+}
+.kits-open-btn {
+  margin-bottom: 12px;
+}
+
+.col-price-kit {
+  text-align: right;
+  white-space: nowrap;
+  width: 120px;
+}
+
+.kits-cell-kit-total {
+  font-weight: 600;
+  text-align: right;
+}
+/* Groupe options (mise en pochette / pastilles) */
+.kc-option-group {
+  display: flex;
+  justify-content: center;  /* centre le Oui/Non */
+  align-items: center;
+  gap: 6px;
+}
+
+/* Par défaut, on cache les champs quantité dans les options */
+.kc-option-group input[type="number"] {
+  display: none;
+}
+
+/* Quand on veut montrer la quantité, on ajoute .has-qty sur le groupe */
+.kc-option-group.has-qty input[type="number"] {
+  display: inline-block;
+}
+
+
+
+/* ========= Boutons ========= */
+.kits-btn-primary,
+.kits-btn-secondary {
+  border-radius: 999px !important;
+  border: none;
+  padding: 8px 20px;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* Champs de quantité */
+.kc-qty-identique,
+.kc-qty-livret,
+.kc-qty-pochette,
+.kc-qty-patron,
+.kc-qty-mepochette,
+.kc-qty-stickers {
+  width: 70px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* Couleurs par bloc */
+.kc-cell-identique {
+  background: #fef3c7; /* jaune pâle */
+}
+
+.kc-cell-livret,
+.kc-col-livret {
+  background: #eff6ff; /* bleu clair */
+}
+
+.kc-cell-pochette,
+.kc-col-pochette {
+  background: #ecfdf5; /* vert clair */
+}
+
+.kc-cell-patron,
+.kc-col-patron {
+  background: #fff7ed; /* orange clair */
+}
+
+.kc-cell-mepochette {
+  background: #f3e8ff; /* violet clair */
+}
+
+.kc-cell-stickers {
+  background: #fef2f2; /* rouge très clair */
+}
+.kc-col-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  margin-right: 4px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.kc-col-icon-l { background: #2563eb; }   /* Livret */
+.kc-col-icon-p { background: #059669; }   /* Pochette */
+.kc-col-icon-t { background: #f97316; }   /* Patron */
+.kc-col-icon-pack { background: #7c3aed; }   /* Mise en pochette */
+.kc-col-icon-stick { background: #dc2626; }  /* Pastille autocollante */
+
+
+
+
+.kits-btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
+}
+
+.kits-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.kits-btn-secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.kits-btn-secondary:hover {
+  background: #d1d5db;
+}
+
+/* ========= Modale ========= */
+.kits-upload-remove {
+  margin-top: 6px;
+  font-size: 11px;
+  border: none;
+  background: none;
+  color: #b91c1c;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  display: none;           /* visible seulement si un fichier est présent */
+}
+
+.kits-upload-remove.is-visible {
+  display: inline-block;
+}
+
+/* upload en erreur (déjà utilisé pour le cas “fichier manquant”) */
+.kits-box-upload-error {
+  border-color: #f97373 !important;
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+.kits-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.kits-modal-backdrop.is-open {
+  display: flex;
+}
+
+.kits-modal {
+  background: #ffffff;
+  border-radius: 18px;
+  /* plus large et plus haute, mais toujours responsive */
+  width: min(1400px, 98vw);
+  max-height: 92vh;
+  padding: 24px 28px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.kits-body {
+  flex: 1;
+  min-height: 0;          /* important pour que le scroll fonctionne */
+  overflow-y: auto;       /* scroll vertical dans le corps */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+.kits-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kits-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.kits-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+/* Sélecteurs arrondis dans le tableau */
+.kc-update-select,
+.kc-mepochette-select,
+.kc-stickers-select {
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  font-size: 12px;
+  background-color: #fff;
+}
+
+/* ========= Toolbar ========= */
+.kits-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.kits-toolbar label {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.kits-toolbar select,
+.kits-toolbar input[type="text"] {
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  padding: 6px 12px;
+  font-size: 13px;
+  min-width: 180px;
+}
+
+.kits-filter-group,
+.kits-search-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========= Tableau ========= */
+.kits-table-wrapper {
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  background: #f9fafb;
+  overflow-x: auto;
+}
+
+.kits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.kits-table th,
+.kits-table td {
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.kits-table thead th {
+  background: #eff6ff;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.kits-subheader th {
+  background: #e5edff;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.col-image {
+  width: 70px;
+}
+
+.col-kit {
+  text-align: left;
+  min-width: 140px;
+}
+
+.col-qte-same {
+  min-width: 130px;
+}
+
+.col-maj select {
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+/* ========= Cellules & inputs ========= */
+.kits-kit-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Colonne Qté identique : couleur spécifique */
+.kits-cell-master {
+  background: #fef3c7; /* jaune pâle */
+}
+
+.kits-cell-highlight {
+  background: #dbeafe; /* bleu pâle pour les composants */
+}
+
+.kits-input {
+  width: 70px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* ========= Icons ========= */
+.kits-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  margin-right: 4px;
+  color: #fff;
+}
+
+.kits-icon-livret {
+  background: #2563eb;
+}
+.kits-icon-pochette {
+  background: #059669;
+}
+.kits-icon-patron {
+  background: #f97316;
+}
+
+.kits-icon-livret::before {
+  content: "L";
+}
+.kits-icon-pochette::before {
+  content: "P";
+}
+.kits-icon-patron::before {
+  content: "T";
+}
+
+/* Imagette du kit (placeholder) */
+.kits-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e5e7eb, #f3f4f6);
+}
+
+/* ========= Bas de la modale ========= */
+.kits-bottom-section {
+  display: none;          /* masquée tant qu’aucun "Oui" */
+  margin-top: 8px;
+}
+
+.kits-bottom-section.is-visible {
+  display: block;
+}
+
+.kits-bottom-toggle {
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #e0ecff;        /* fond coloré plus visible */
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+
+.kits-bottom-toggle-icon {
+  transition: transform 0.15s ease-out;
+}
+
+.kits-bottom-toggle-icon.is-open {
+  transform: rotate(180deg);
+}
+
+/* la grille elle-même */
+.kits-bottom-grid {
+  display: none; /* fermée par défaut */
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+margin-top: 12px;   /* <-- ajoute de l’air entre le bouton et les blocs */
+}
+
+.kits-bottom-grid.is-open {
+  display: grid;
+}
+
+
+.kits-box {
+  border-radius: 20px;
+  padding: 18px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Upload */
+.kits-box-upload {
+  background: #e5f0ff;
+  border: 1px dashed #93c5fd;
+  color: #1e3a8a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-align: center;
+}
+
+.kits-box-upload.is-dragover {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+.kits-upload-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.kits-upload-hint {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.kits-upload-filename {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Commentaire */
+.kits-box-comment {
+  background: #e5f0ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  display: flex;
+  flex-direction: column;
+}
+
+.kits-comment-label {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.kits-comment-textarea {
+  flex: 1;
+  border-radius: 12px;
+  border: 1px solid #93c5fd;
+  padding: 8px 10px;
+  font-size: 13px;
+  resize: vertical;   /* poignée pour agrandir/rétrécir */
+  min-height: 80px;
+  max-height: 220px;  /* pour éviter qu'elle ne prenne tout l'écran */
+  overflow: auto;     /* scroll interne si texte très long */
+}
+.kits-box-upload-error {
+  border-color: #f97373 !important;
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+/* ========= Footer actions ========= */
+.kits-footer-actions {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;   /* erreur au-dessus, puis la ligne des boutons */
+  gap: 8px;
+  align-items: stretch;     /* le bloc d’erreur prend toute la largeur */
+}
+
+
+.kits-total {
+  margin-right: auto;
+  font-size: 14px;
+  color: #111827;
+}
+
+.kits-total-value {
+  font-weight: 600;
+}
+
+
+.kits-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+@media (max-width: 768px) {
+  .kits-footer-row {
+    flex-wrap: wrap;               /* permet de passer sur 2 lignes */
+  }
+
+  .kits-total {
+    flex-basis: 100%;              /* prend toute la ligne */
+    order: 3;                      /* s’affiche sous les boutons */
+    margin-right: 0;
+    text-align: right;
+    margin-top: 4px;
+  }
+}
+
+
+.kits-total {
+  margin-right: auto;
+  font-size: 14px;
+  color: #111827;
+}
+
+.kits-total-value {
+  font-weight: 600;
+}
+
+/* message d’erreur */
+.kits-error {
+  position: relative;
+  display: none;
+  margin-bottom: 0;         /* plus besoin de 4px vu qu’on a gap:8px */
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12px;
+  white-space: normal;
+  box-sizing: border-box;
+  width: 100%;              /* prend toute la largeur de la modale */
+}
+
+
+.kits-error-header {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* bouton "X" à cheval sur le coin haut droit */
+.kits-error-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: #fee2e2;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kits-error-close:hover {
+  background: #fecaca;
+}
+
+
+.kits-error p {
+  margin: 0 0 4px;
+}
+
+.kits-error p:last-child {
+  margin-bottom: 0;
+}
+
+
+/* ========= Responsive ========= */
+@media (max-width: 768px) {
+  .kits-modal {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    padding: 16px;
+  }
+
+  .kits-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kits-table th,
+  .kits-table td {
+    padding: 6px 8px;
+  }
+}
+
+</style>
+
+<script>
+  (function () {
+// === CONFIG FRONT ===
+// Remplace par l'URL de ton serveur Render (sans slash final)
+var KITS_API_BASE_URL = 'https://kits-couture-api.onrender.com';
+
+// Récupération de l’email client côté Pressero.
+// Priorité : input caché > div#correo > variable globale
+function getCurrentCustomerEmail() {
+  // 1) input hidden éventuel
+  var hidden = document.getElementById('kitsCustomerEmail');
+  if (hidden && hidden.value) {
+    return hidden.value.trim();
+  }
+
+  // 2) div#correo alimenté par ###USERINFO, email###
+  var correoDiv = document.getElementById('correo');
+  if (correoDiv && correoDiv.textContent) {
+    return correoDiv.textContent.trim();
+  }
+
+  // 3) variable globale éventuelle
+  if (window.kitsCurrentEmail) {
+    return String(window.kitsCurrentEmail).trim();
+  }
+
+  // 4) fallback : rien trouvé
+  return '';
+}
+
+
+
+    /* === Déplacer le bouton "Mes kits de couture" au-dessus du calculateur === */
+    function repositionKitsButton() {
+      try {
+        var btnOpen = document.getElementById('openKitsModal');
+        if (!btnOpen) return;
+
+        // colonne du formulaire produit
+        var productFormCol = document.querySelector('.col-md-6.product-form');
+        // bloc du calculateur
+        var pricingArea = document.getElementById('pricingArea');
+
+        if (productFormCol && pricingArea) {
+          // on insère le bouton juste avant le calculateur
+          productFormCol.insertBefore(btnOpen, pricingArea);
+        }
+      } catch (e) {
+        console.warn('[KITS] Impossible de repositionner le bouton Mes kits de couture', e);
+      }
+    }
+
+    // on s'assure que le DOM est prêt
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', repositionKitsButton);
+    } else {
+      repositionKitsButton();
+    }
+    /* ====================================================================== */
+
+    // ====== À partir d'ici : TON SCRIPT EXISTANT (sans nouveau "(function () {") ======
+    var btnOpen   = document.getElementById('openKitsModal');
+    var backdrop  = document.getElementById('kitsModalBackdrop');
+    var btnClose  = document.getElementById('closeKitsModal');
+    var btnCancel = document.getElementById('cancelKits');
+    var btnSend   = document.getElementById('kitsSendBtn');
+
+    var bottomSection    = document.getElementById('kitsBottomSection');
+    var bottomGrid       = document.getElementById('kitsBottomGrid');
+    var bottomToggle     = document.getElementById('kitsBottomToggle');
+    var bottomToggleIcon = document.getElementById('kitsBottomToggleIcon');
+    var uploadArea       = document.getElementById('kitsUploadArea');
+    var uploadFilename   = document.getElementById('kitsUploadFilename');
+    var uploadRemoveBtn  = document.getElementById('kitsUploadRemove');
+    var errorBox         = document.getElementById('kitsError');
+
+    var MIN_LIVRETS    = 100;
+    var MIN_POCHETTES  = 100;
+
+    function isYesValue(val) {
+      var s = (val || '').toString().trim().toLowerCase();
+      return s === 'oui' || s === 'yes' || s === 'si' || s === 'sí';
+    }
+
+    function formatEuro(amount) {
+      if (!isFinite(amount)) amount = 0;
+      return amount.toFixed(2).replace('.', ',') + ' €';
+    }
+
+    function recalcRowTotal(row) {
+      if (!row) return;
+
+      var qLivretInp   = row.querySelector('.kits-input-qte-component[data-component="livret"]');
+      var qPochetteInp = row.querySelector('.kits-input-qte-component[data-component="pochette"]');
+      var qPatronInp   = row.querySelector('.kits-input-qte-component[data-component="patron"]');
+      var cellTotal    = row.querySelector('.kits-cell-kit-total');
+
+      if (!cellTotal) return;
+
+      var qLivret   = qLivretInp   ? parseNumber(qLivretInp.value)   : 0;
+      var qPochette = qPochetteInp ? parseNumber(qPochetteInp.value) : 0;
+      var qPatron   = qPatronInp   ? parseNumber(qPatronInp.value)   : 0;
+
+      var pLivret   = parseNumber(row.getAttribute('data-price-livret'));
+      var pPochette = parseNumber(row.getAttribute('data-price-pochette'));
+      var pPatron   = parseNumber(row.getAttribute('data-price-patron'));
+
+      var total = qLivret * pLivret + qPochette * pPochette + qPatron * pPatron;
+
+      cellTotal.textContent = formatEuro(total);
+      row.dataset.kitTotal = isNaN(total) ? '0' : total.toFixed(2);
+    }
+
+    function recalcGrandTotal() {
+      var total = 0;
+      var kitRows = document.querySelectorAll('tr[data-kit-row]');
+      kitRows.forEach(function (row) {
+        total += parseNumber(row.dataset.kitTotal || '0');
+      });
+      var totalSpan = document.querySelector('.kits-total-value');
+      if (totalSpan) {
+        totalSpan.textContent = formatEuro(total);
+      }
+    }
+
+    function recalcAllTotals() {
+      var kitRows = document.querySelectorAll('tr[data-kit-row]');
+      kitRows.forEach(recalcRowTotal);
+      recalcGrandTotal();
+    }
+
+function initRowBehavior(row) {
+  var sameInput = row.querySelector('.kits-input-qte-identique');
+  var componentInputs = row.querySelectorAll('.kits-input-qte-component');
+
+  if (!sameInput || !componentInputs.length) return;
+
+  // Qté identique → copie sur les 3 colonnes
+  sameInput.addEventListener('input', function () {
+    var val = sameInput.value;
+    row.dataset.mode = 'linked';
+
+    componentInputs.forEach(function (inp) {
+      if (val !== '') inp.value = val;
+    });
+
+    recalcRowTotal(row);
+    recalcGrandTotal();
+    updatePackagingAndStickers(row); // la pochette change aussi
+  });
+
+  // Qtés individuelles → on passe en mode manuel
+  componentInputs.forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      row.dataset.mode = 'manual';
+      sameInput.value = '';
+
+      recalcRowTotal(row);
+      recalcGrandTotal();
+
+      if (inp.getAttribute('data-component') === 'pochette') {
+        updatePackagingAndStickers(row);
+      }
+    });
+  });
+
+  // calcul initial
+  recalcRowTotal(row);
+  initPackagingAndStickersRow(row);
+}
+
+function initPackagingAndStickersRow(row) {
+  var meSelect = row.querySelector('.kc-mepochette-select');
+  var meQty    = row.querySelector('.kc-qty-mepochette');
+  var stSelect = row.querySelector('.kc-stickers-select');
+  var stQty    = row.querySelector('.kc-qty-stickers');
+
+    if (meSelect) {
+    meSelect.addEventListener('change', function () {
+      // on repart sur les valeurs automatiques
+      if (meQty) meQty.dataset.manual = '';
+      if (stQty) stQty.dataset.manual = '';
+      updatePackagingAndStickers(row);
+    });
+  }
+
+
+  if (meQty) {
+    meQty.addEventListener('input', function () {
+      meQty.dataset.manual = '1';
+      updatePackagingAndStickers(row);
+    });
+  }
+
+  if (stSelect) {
+    stSelect.addEventListener('change', function () {
+      // l’utilisateur force Oui/Non pour les pastilles
+      if (stQty) stQty.dataset.manual = '1';
+      updatePackagingAndStickers(row);
+    });
+  }
+
+  if (stQty) {
+    stQty.addEventListener('input', function () {
+      stQty.dataset.manual = '1';
+      updatePackagingAndStickers(row);
+    });
+  }
+
+  // premier calcul avec les valeurs par défaut
+  updatePackagingAndStickers(row);
+}
+
+function updateStickersColumnVisibility() {
+  var groups = document.querySelectorAll('.kc-option-stickers');
+  var anyVisible = false;
+
+  groups.forEach(function (g) {
+    if (g.style.display !== 'none') {
+      anyVisible = true;
+    }
+  });
+
+  var th = document.querySelector('.kc-th-stickers');
+  var cells = document.querySelectorAll('.kc-cell-stickers');
+
+  if (!th || !cells.length) return;
+
+  if (anyVisible) {
+    th.style.display = '';
+    cells.forEach(function (c) { c.style.display = ''; });
+  } else {
+    th.style.display = 'none';
+    cells.forEach(function (c) { c.style.display = 'none'; });
+  }
+}
+
+
+
+function updatePackagingAndStickers(row) {
+  var pochetteInput = row.querySelector(
+    '.kits-input-qte-component[data-component="pochette"]'
+  );
+  var pochetteQty = pochetteInput ? parseNumber(pochetteInput.value) : 0;
+
+  var meGroup  = row.querySelector('.kc-option-mepochette');
+  var meSelect = row.querySelector('.kc-mepochette-select');
+  var meQty    = row.querySelector('.kc-qty-mepochette');
+
+  var stGroup  = row.querySelector('.kc-option-stickers');
+  var stSelect = row.querySelector('.kc-stickers-select');
+  var stQty    = row.querySelector('.kc-qty-stickers');
+
+  // 1) Aucune pochette => on cache tout
+  if (!pochetteQty) {
+    if (meGroup) {
+      meGroup.style.display = 'none';
+      meGroup.classList.remove('has-qty');
+    }
+    if (stGroup) {
+      stGroup.style.display = 'none';
+      stGroup.classList.remove('has-qty');
+    }
+    if (meQty) {
+      meQty.value = '';
+      meQty.dataset.manual = '';
+    }
+    if (stQty) {
+      stQty.value = '';
+      stQty.dataset.manual = '';
+    }
+    if (stSelect) stSelect.value = 'Non';
+
+    updateStickersColumnVisibility();
+    return;
+  } else {
+    if (meGroup) {
+      meGroup.style.display = 'flex';
+    }
+  }
+
+  var isMeYes = meSelect && isYesValue(meSelect.value);
+
+  // 2) Mise en pochette = OUI
+  if (isMeYes) {
+    // le groupe Mise en pochette montre sa quantité
+    if (meGroup) meGroup.classList.add('has-qty');
+
+    if (meQty && !meQty.dataset.manual) {
+      // par défaut = toutes les pochettes
+      meQty.value = pochetteQty;
+    }
+
+    // Pastilles complètement cachées
+    if (stGroup) {
+      stGroup.style.display = 'none';
+      stGroup.classList.remove('has-qty');
+    }
+    if (stQty) {
+      stQty.value = '';
+      stQty.dataset.manual = '';
+    }
+    if (stSelect) stSelect.value = 'Non';
+
+  } else {
+    // 3) Mise en pochette = NON
+    // → le select reste seul (pas de quantité)
+    if (meGroup) meGroup.classList.remove('has-qty');
+    if (meQty) {
+      meQty.value = '';
+      meQty.dataset.manual = '';
+    }
+
+    // → toutes les pochettes ont besoin de pastilles par défaut
+    if (stGroup) {
+      stGroup.style.display = 'flex';
+      stGroup.classList.add('has-qty'); // on montre la quantité de pastilles
+    }
+    if (stSelect && !isYesValue(stSelect.value)) {
+      stSelect.value = 'Oui';
+    }
+    if (stQty && !stQty.dataset.manual) {
+      stQty.value = pochetteQty;
+    }
+  }
+
+  // 4) Met à jour la visibilité globale de la colonne Pastille
+  updateStickersColumnVisibility();
+}
+
+
+
+function buildKitsTableFromApiData(kits) {
+  var tbody = document.getElementById('kitsTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+
+  kits.forEach(function (kit) {
+    var tr = document.createElement('tr');
+    tr.className = 'kc-kit-row';
+    tr.setAttribute('data-kit-row', '1');
+    tr.setAttribute('data-kit-id', kit.kitId || '');
+    tr.setAttribute('data-price-livret', kit.priceLivret || 0);
+    tr.setAttribute('data-price-pochette', kit.pricePochette || 0);
+    tr.setAttribute('data-price-patron', kit.pricePatron || 0);
+    tr.dataset.kitTotal = '0';
+
+    var defaultLivret   = kit.defaultQtyLivret   || 0;
+    var defaultPochette = kit.defaultQtyPochette || 0;
+    var defaultPatron   = kit.defaultQtyPatron   || 0;
+
+    tr.innerHTML =
+      '<td class="kc-kit-image"><div class="kc-image-placeholder"></div></td>' +
+      '<td class="kc-kit-name">' + (kit.name || '') + '</td>' +
+      '<td class="kc-cell-identique">' +
+        '<input type="number" class="kc-qty-identique kits-input-qte-identique" min="0" step="1" value="' + defaultLivret + '">' +
+      '</td>' +
+
+      '<td class="kc-cell-qty kc-cell-livret">' +
+        '<input type="number" class="kc-qty-livret kits-input-qte-component" data-component="livret" min="0" step="1" value="' + defaultLivret + '">' +
+      '</td>' +
+      '<td class="kc-cell-price kc-cell-livret">' +
+        '<span class="kc-price-livret">' + formatEuro(kit.priceLivret || 0) + '</span>' +
+      '</td>' +
+
+      '<td class="kc-cell-qty kc-cell-pochette">' +
+        '<input type="number" class="kc-qty-pochette kits-input-qte-component" data-component="pochette" min="0" step="1" value="' + defaultPochette + '">' +
+      '</td>' +
+      '<td class="kc-cell-price kc-cell-pochette">' +
+        '<span class="kc-price-pochette">' + formatEuro(kit.pricePochette || 0) + '</span>' +
+      '</td>' +
+
+      '<td class="kc-cell-qty kc-cell-patron">' +
+        '<input type="number" class="kc-qty-patron kits-input-qte-component" data-component="patron" min="0" step="1" value="' + defaultPatron + '">' +
+      '</td>' +
+      '<td class="kc-cell-price kc-cell-patron">' +
+        '<span class="kc-price-patron">' + formatEuro(kit.pricePatron || 0) + '</span>' +
+      '</td>' +
+
+      '<td class="kc-cell-update">' +
+        '<select class="kc-update-select">' +
+          '<option value="Non">Non</option>' +
+          '<option value="Oui">Oui</option>' +
+        '</select>' +
+      '</td>' +
+
+      '<td class="kc-cell-mepochette">' +
+        '<div class="kc-option-group kc-option-mepochette">' +
+          '<select class="kc-mepochette-select">' +
+            '<option value="Non">Non</option>' +
+            '<option value="Oui">Oui</option>' +
+          '</select>' +
+          '<input type="number" class="kc-qty-mepochette" min="0" step="1" placeholder="Qté">' +
+        '</div>' +
+      '</td>' +
+
+      '<td class="kc-cell-stickers">' +
+        '<div class="kc-option-group kc-option-stickers">' +
+          '<select class="kc-stickers-select">' +
+            '<option value="Non">Non</option>' +
+            '<option value="Oui">Oui</option>' +
+          '</select>' +
+          '<input type="number" class="kc-qty-stickers" min="0" step="1" placeholder="Qté">' +
+        '</div>' +
+      '</td>';
+
+    tbody.appendChild(tr);
+  });
+
+  // Initialiser tous les comportements sur les nouvelles lignes
+  var rows = tbody.querySelectorAll('tr[data-kit-row]');
+  rows.forEach(function (row) {
+    initRowBehavior(row);
+  });
+
+  recalcGrandTotal();
+}
+
+ var kitsLoaded = false;
+
+function loadKitsFromApiOnce() {
+  if (kitsLoaded) return;
+  kitsLoaded = true;
+
+  var email = getCurrentCustomerEmail();
+  if (!email) {
+    console.warn('[KITS] Email client introuvable, impossible d’appeler /kits');
+    return;
+  }
+
+  var url = KITS_API_BASE_URL + '/kits?email=' + encodeURIComponent(email);
+
+  fetch(url)
+    .then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(function (data) {
+      if (!data || !Array.isArray(data.kits)) {
+        console.warn('[KITS] Réponse /kits inattendue', data);
+        return;
+      }
+      buildKitsTableFromApiData(data.kits);
+    })
+    .catch(function (err) {
+      console.error('[KITS] Erreur lors de l’appel /kits :', err);
+    });
+}
+
+
+
+    /* ---- ouverture / fermeture modale ---- */
+    function openModal() {
+      if (!backdrop) return;
+loadKitsFromApiOnce();
+      backdrop.classList.add('is-open');
+    }
+
+    function closeModal() {
+      if (!backdrop) return;
+      backdrop.classList.remove('is-open');
+    }
+
+   if (btnOpen) {
+  // s’assurer qu’il ne déclenche pas un submit
+  btnOpen.setAttribute('type', 'button');
+
+  btnOpen.addEventListener('click', function (e) {
+    e.preventDefault();     // empêche un submit éventuel
+    e.stopPropagation();    // bloque la remontée vers d’autres handlers
+    openModal();
+  });
+}
+
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+
+    if (backdrop) {
+      backdrop.addEventListener('click', function (e) {
+        if (e.target === backdrop) closeModal();
+      });
+    }
+
+   
+        /* ---- Qté identique / manuel (lignes initiales) ---- */
+var rows = document.querySelectorAll('tr[data-kit-row]');
+rows.forEach(function (row) {
+  initRowBehavior(row);
+});
+recalcGrandTotal();
+
+        
+    /* ---- helpers fichiers ---- */
+    function hasAnyUploadedFile() {
+      var inputs = document.querySelectorAll('input[type="file"][id^="fileUploads"]');
+      for (var i = 0; i < inputs.length; i++) {
+        if (inputs[i].files && inputs[i].files.length > 0) return true;
+      }
+      return false;
+    }
+
+    function updateUploadUiFromSlots() {
+      if (!uploadFilename) return;
+      var inputs = document.querySelectorAll('input[type="file"][id^="fileUploads"]');
+      var label = '';
+      var hasFile = false;
+
+      for (var i = 0; i < inputs.length; i++) {
+        var files = inputs[i].files;
+        if (files && files.length) {
+          hasFile = true;
+          label = files.length === 1 ? files[0].name : files.length + ' fichiers sélectionnés';
+          break;
+        }
+      }
+
+      if (hasFile) {
+        uploadFilename.textContent = label;
+        if (uploadRemoveBtn) uploadRemoveBtn.classList.add('is-visible');
+        if (uploadArea) uploadArea.classList.remove('kits-box-upload-error');
+      } else {
+        uploadFilename.textContent = '';
+        if (uploadRemoveBtn) uploadRemoveBtn.classList.remove('is-visible');
+      }
+    }
+
+    function removeAllUploadedFiles() {
+      var removeBtns = document.querySelectorAll('.btn-progress-remove');
+      if (removeBtns.length) {
+        removeBtns.forEach(function (btn) { btn.click(); });
+        setTimeout(updateUploadUiFromSlots, 200);
+        return;
+      }
+
+      var inputs = document.querySelectorAll('input[type="file"][id^="fileUploads"]');
+      inputs.forEach(function (inp) {
+        inp.value = '';
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      updateUploadUiFromSlots();
+    }
+
+    
+    /* ---- section Upload/Commentaire ---- */
+function updateBottomVisibility() {
+  if (!bottomSection) return;
+
+  // On regarde toutes les colonnes "Mise à jour fichier"
+  var selects = document.querySelectorAll('.kits-select-maj, .kc-update-select');
+  var showUpload = false;
+
+  selects.forEach(function (sel) {
+    if (isYesValue(sel.value)) showUpload = true;
+  });
+
+  // Le bloc bas est toujours disponible
+  bottomSection.classList.add('is-visible');
+
+  if (showUpload) {
+    if (uploadArea) {
+      uploadArea.style.display = '';
+      uploadArea.classList.remove('kits-box-upload-error');
+    }
+    // On ouvre la section et la grille pour que l'upload soit visible
+    ensureBottomOpen();
+  } else {
+    if (uploadArea) {
+      uploadArea.style.display = 'none';
+      uploadArea.classList.remove('kits-box-upload-error');
+    }
+    // on nettoie les fichiers si plus aucune mise à jour n'est demandée
+    removeAllUploadedFiles();
+  }
+}
+
+
+
+// === Mise à jour de la visibilité de la zone Upload/Commentaire
+// On écoute *toutes* les modifications sur les select de mise à jour,
+// y compris ceux créés dynamiquement par l'API
+document.addEventListener('change', function (e) {
+  var t = e.target;
+  if (t && t.matches('.kits-select-maj, .kc-update-select')) {
+    updateBottomVisibility();
+  }
+}, true);
+
+// état initial (en fonction des valeurs par défaut)
+updateBottomVisibility();
+
+
+
+    function ensureBottomOpen() {
+      if (!bottomSection || !bottomGrid) return;
+      bottomSection.classList.add('is-visible');
+      bottomGrid.classList.add('is-open');
+      if (bottomToggleIcon) bottomToggleIcon.classList.add('is-open');
+    }
+
+    if (bottomToggle && bottomGrid) {
+      bottomToggle.addEventListener('click', function () {
+        var open = bottomGrid.classList.toggle('is-open');
+        if (bottomToggleIcon) {
+          if (open) bottomToggleIcon.classList.add('is-open');
+          else bottomToggleIcon.classList.remove('is-open');
+        }
+      });
+    }
+
+    /* ---- diffuseur upload ---- */
+    function findMultiUploadPicker() {
+      var picker = document.querySelector('input.pc-dz-picker');
+      if (picker) return picker;
+      return document.querySelector('input[type="file"][id^="fileUploads"]');
+    }
+
+    if (uploadArea) {
+      uploadArea.addEventListener('click', function () {
+        var picker = findMultiUploadPicker();
+        if (picker) picker.click();
+      });
+
+      uploadArea.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        uploadArea.classList.add('is-dragover');
+      });
+
+      uploadArea.addEventListener('dragleave', function (e) {
+        if (e.target === uploadArea) {
+          uploadArea.classList.remove('is-dragover');
+        }
+      });
+
+      uploadArea.addEventListener('drop', function (e) {
+        e.preventDefault();
+        uploadArea.classList.remove('is-dragover');
+
+        var picker = findMultiUploadPicker();
+        if (!picker) return;
+
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) return;
+
+        try {
+          var dt = new DataTransfer();
+          for (var i = 0; i < files.length; i++) {
+            dt.items.add(files[i]);
+          }
+          picker.files = dt.files;
+          picker.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (err) {
+          console.warn('[KITS] Impossible de propager les fichiers vers pc-dz-picker', err);
+        }
+      });
+    }
+
+    document.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t.matches('input[type="file"][id^="fileUploads"]')) return;
+      updateUploadUiFromSlots();
+    }, true);
+
+    if (uploadRemoveBtn) {
+      uploadRemoveBtn.addEventListener('click', function () {
+        removeAllUploadedFiles();
+      });
+    }
+
+    /* ---- erreurs (quantités + fichiers) ---- */
+    function parseNumber(value) {
+      if (value == null) return 0;
+      var v = String(value).trim().replace(',', '.');
+      var n = parseFloat(v);
+      return isNaN(n) ? 0 : n;
+    }
+
+    function clearError() {
+      if (errorBox) {
+        errorBox.innerHTML = '';
+        errorBox.style.display = 'none';
+      }
+      if (uploadArea) uploadArea.classList.remove('kits-box-upload-error');
+    }
+
+    function showError(html) {
+      if (!errorBox) return;
+      errorBox.innerHTML =
+        '<div class="kits-error-header">' +
+          '<span>Attention</span>' +
+          '<button type="button" class="kits-error-close" aria-label="Fermer l’alerte">×</button>' +
+        '</div>' +
+        html;
+      errorBox.style.display = 'block';
+    }
+
+    if (errorBox) {
+      errorBox.addEventListener('click', function (e) {
+        if (e.target.classList.contains('kits-error-close')) {
+          errorBox.style.display = 'none';
+        }
+      });
+    }
+
+    function checkMinQuantities() {
+      var totalLivrets = 0;
+      var totalPochettes = 0;
+
+      var allRows = document.querySelectorAll('tr[data-kit-row]');
+      allRows.forEach(function (row) {
+        var livretInput   = row.querySelector('.kits-input-qte-component[data-component="livret"]');
+        var pochetteInput = row.querySelector('.kits-input-qte-component[data-component="pochette"]');
+
+        if (livretInput)   totalLivrets   += parseNumber(livretInput.value);
+        if (pochetteInput) totalPochettes += parseNumber(pochetteInput.value);
+      });
+
+      var missingLivrets   = Math.max(0, MIN_LIVRETS   - totalLivrets);
+      var missingPochettes = Math.max(0, MIN_POCHETTES - totalPochettes);
+
+      if (missingLivrets > 0 || missingPochettes > 0) {
+        var htmlParts = [];
+
+        if (missingLivrets > 0) {
+          htmlParts.push(
+            '<p>Il vous manque <strong>' + missingLivrets + ' livret(s)</strong> ' +
+            'pour atteindre la quantité minimum de <strong>' + MIN_LIVRETS + ' livret(s)</strong>.</p>'
+          );
+        }
+
+        if (missingPochettes > 0) {
+          htmlParts.push(
+            '<p>Il vous manque <strong>' + missingPochettes + ' pochette(s)</strong> ' +
+            'pour atteindre la quantité minimum de <strong>' + MIN_POCHETTES + ' pochette(s)</strong>.</p>'
+          );
+        }
+
+        htmlParts.push(
+          '<p><strong>Note :</strong> vous pouvez panacher les quantités de différents modèles.</p>'
+        );
+
+        showError(htmlParts.join(''));
+        return false;
+      }
+
+      return true;
+    }
+
+   function hasUpdateRequest() {
+  // idem : on accepte .kits-select-maj et .kc-update-select
+  var selects = document.querySelectorAll('.kits-select-maj, .kc-update-select');
+  var found = false;
+  selects.forEach(function (sel) {
+    if (isYesValue(sel.value)) found = true;
+  });
+  return found;
+}
+
+
+    function checkFilesIfNeeded() {
+      if (!hasUpdateRequest()) return true;
+      if (hasAnyUploadedFile()) return true;
+
+      ensureBottomOpen();
+      if (uploadArea) {
+        uploadArea.classList.add('kits-box-upload-error');
+        uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      showError(
+        '<p>Vous avez demandé des <strong>mises à jour de fichiers</strong> ' +
+        'mais aucun fichier n’a été chargé.</p>' +
+        '<p>Veuillez compresser vos fichiers dans un <strong>dossier ZIP</strong> ' +
+        'et le charger dans la zone «&nbsp;Téléchargez vos fichiers&nbsp;».</p>'
+      );
+      return false;
+    }
+
+    if (btnSend) {
+      btnSend.addEventListener('click', function (e) {
+        clearError();
+
+        if (!checkMinQuantities()) {
+          e.preventDefault();
+          return;
+        }
+
+        if (!checkFilesIfNeeded()) {
+          e.preventDefault();
+          return;
+        }
+
+        console.log('[KITS] Quantités et fichiers OK, on peut envoyer vers la commande.');
+      });
+    }
+
+    updateUploadUiFromSlots();
+  })();
+</script>

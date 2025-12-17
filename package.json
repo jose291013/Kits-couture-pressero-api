@@ -1,5 +1,5 @@
 {
-  "name": "kits-couture-api",
+  "name": "kits-couture-pressero-api",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {

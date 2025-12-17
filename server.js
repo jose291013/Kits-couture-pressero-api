@@ -103,7 +103,7 @@ async function ensureSheetExists(sheetName) {
   // 3) Poser la ligne d'en-têtes (A1:S1)
   await sheets.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
-    range: `'${sheetName}'!A1:S1`, // <-- A → S (19 colonnes)
+    range: `'${sheetName}'!A1:V1`, // <-- A → V (22 colonnes)
     valueInputOption: 'RAW',
     requestBody: {
       values: [
@@ -126,7 +126,10 @@ async function ensureSheetExists(sheetName) {
           'PatronM2', // P
           'ImpressionPatron', // Q
           'Active', // R
-          'PJMOptionsJSON' // S
+          'PJMOptionsJSON', // S
+          'PresseroLivretJSON',      // T
+'PresseroPochetteJSON',    // U
+'PresseroPatronJSON'       // V
         ]
       ]
     }
@@ -165,6 +168,10 @@ function kitToRow(kit) {
     kit.impressionPatron || '', // Q - ImpressionPatron
     kit.active ? 'Oui' : 'Non', // R - Active
     kit.pjmOptionsJson || '' // S - PJMOptionsJSON
+    presseroLivretJson: body.presseroLivretJson || '',
+presseroPochetteJson: body.presseroPochetteJson || '',
+presseroPatronJson: body.presseroPatronJson || ''
+
   ];
 }
 
@@ -250,7 +257,7 @@ app.get('/admin/kits', async (req, res) => {
     await ensureSheetExists(sheetName);
 
     // A → S (19 colonnes)
-    const range = `'${sheetName}'!A2:S`;
+    const range = `'${sheetName}'!A2:V`;
 
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId: GOOGLE_SHEETS_SPREADSHEET_ID,
@@ -287,6 +294,10 @@ app.get('/admin/kits', async (req, res) => {
           impressionPatron: row[16] || '',
           activeRaw: row[17] || '',
           pjmOptionsJson: row[18] || ''
+          presseroLivretJson: row[19] || '',
+presseroPochetteJson: row[20] || '',
+presseroPatronJson: row[21] || ''
+
         };
       });
 
@@ -326,7 +337,7 @@ app.post('/admin/kits/save', express.json(), async (req, res) => {
     const finalKitId = rawKitId || generatedKitId;
 
     // On lit les lignes existantes
-    const range = `'${sheetName}'!A2:S`;
+    const range = `'${sheetName}'!A2:V`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -373,7 +384,7 @@ app.post('/admin/kits/save', express.json(), async (req, res) => {
       // ---- UPDATE d'une ligne existante ----
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `'${sheetName}'!A${rowIndex}:S${rowIndex}`,
+        range: `'${sheetName}'!A${rowIndex}:V${rowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
           values: rowValues
@@ -383,7 +394,7 @@ app.post('/admin/kits/save', express.json(), async (req, res) => {
       // ---- APPEND d'une nouvelle ligne ----
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: `'${sheetName}'!A2:S`,
+        range: `'${sheetName}'!A2:V`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         requestBody: {
@@ -515,6 +526,134 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
   }
 });
 
+// ====== Pressero token cache (par adminUrl) ======
+const presseroTokenCache = new Map(); // key: adminUrl => { token, expiresAt }
+
+function normalizeSiteDomain(siteDomain) {
+  const raw = String(siteDomain || '').trim();
+  // si on reçoit "equipe3.ams.v6.pressero.com" -> "equipe3"
+  return raw.split('.')[0];
+}
+
+async function getPresseroToken(adminUrl) {
+  const key = String(adminUrl || '').trim();
+  if (!key) throw new Error('adminUrl manquant');
+
+  const now = Date.now();
+  const cached = presseroTokenCache.get(key);
+  if (cached && cached.token && cached.expiresAt > now + 60_000) {
+    return cached.token;
+  }
+
+  const username = process.env.PRESSERO_ADMIN_USER;
+  const password = process.env.PRESSERO_ADMIN_PASSWORD;
+  const subscriberId = process.env.PRESSERO_SUBSCRIBER_ID;
+  const consumerId = process.env.PRESSERO_CONSUMER_ID;
+
+  if (!username || !password || !subscriberId || !consumerId) {
+    throw new Error('Pressero credentials (env) manquants');
+  }
+
+  const url = `https://${key}/api/v2/Authentication`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      // ⚠️ garde exactement les noms de champs que tu utilises dans Postman
+      Username: username,
+      Password: password,
+      SubscriberId: subscriberId,
+      ConsumerId: consumerId
+    })
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Pressero Authentication HTTP ${res.status}: ${txt}`);
+  }
+
+  const data = await res.json();
+  const token = data && (data.Token || data.token);
+  if (!token) throw new Error('Token Pressero manquant dans la réponse');
+
+  // si Pressero renvoie une durée, utilise-la ; sinon 25 min par défaut
+  const durationMin = data.TokenDuration || data.tokenDuration || 25;
+  presseroTokenCache.set(key, { token, expiresAt: now + durationMin * 60_000 });
+
+  return token;
+}
+
+async function callPressero(adminUrl, path, method, body) {
+  const token = await getPresseroToken(adminUrl);
+  const url = `https://${adminUrl}${path}`;
+
+  const res = await fetch(url, {
+    method: method || 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `token ${token}`
+    },
+    body: JSON.stringify(body || {})
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Pressero ${path} HTTP ${res.status}: ${txt}`);
+  }
+  return res.json();
+}
+// ===================== ADMIN - OPTIONS PRESSERO =====================
+app.post('/admin/pressero/options', async (req, res) => {
+  try {
+    const { adminUrl, siteDomain, siteUserId, productId } = req.body || {};
+
+    if (!adminUrl || !siteDomain || !siteUserId || !productId) {
+      return res.status(400).json({ error: 'adminUrl/siteDomain/siteUserId/productId requis' });
+    }
+
+    const sd = normalizeSiteDomain(siteDomain);
+
+    const path = `/api/cart/${sd}/product/${productId}/options/?userId=${encodeURIComponent(siteUserId)}`;
+
+    const data = await callPressero(adminUrl, path, 'POST', {
+      Quantities: [],
+      Options: [],
+      SelectedUOM: null
+    });
+
+    return res.json({ ok: true, raw: data });
+  } catch (err) {
+    return res.status(500).json({ error: 'Error loading Pressero options', details: err.message });
+  }
+});
+
+// ===================== ADMIN - PRIX PRESSERO =====================
+app.post('/admin/pressero/price', async (req, res) => {
+  try {
+    const { adminUrl, siteDomain, siteUserId, productId, quantities, options, selectedUom } = req.body || {};
+
+    if (!adminUrl || !siteDomain || !siteUserId || !productId) {
+      return res.status(400).json({ error: 'adminUrl/siteDomain/siteUserId/productId requis' });
+    }
+
+    const sd = normalizeSiteDomain(siteDomain);
+
+    const path = `/api/cart/${sd}/product/${productId}/price?userId=${encodeURIComponent(siteUserId)}`;
+
+    const data = await callPressero(adminUrl, path, 'POST', {
+      Quantities: Array.isArray(quantities) ? quantities : [],
+      Options: Array.isArray(options) ? options : [],
+      SelectedUOM: selectedUom ?? null
+    });
+
+    return res.json({ ok: true, raw: data });
+  } catch (err) {
+    return res.status(500).json({ error: 'Error loading Pressero price', details: err.message });
+  }
+});
+
+
 // ===================== HEALTHCHECK =====================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', spreadsheetId: SPREADSHEET_ID });
@@ -529,7 +668,7 @@ app.get('/kits', async (req, res) => {
   }
 
   const sheetName = email;
-  const range = `'${sheetName}'!A2:S`;
+  const range = `'${sheetName}'!A2:V`;
 
   try {
     await ensureSheetExists(sheetName);
@@ -563,7 +702,10 @@ app.get('/kits', async (req, res) => {
           patronM2,
           impressionPatron,
           activeFlag,
-          pjmOptionsJson
+          pjmOptionsJson,
+          presseroLivretJson,
+          presseroPochetteJson,
+          presseroPatronJson
         ] = row;
 
         const defaultQtyLivret = parseNumberFromSheet(defaultQtyLivretRaw);
