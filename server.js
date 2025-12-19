@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const { google } = require('googleapis');
+const multer = require('multer');
+const FormData = require('form-data');
+const fs = require('fs');
+
 
 // ====== CONFIG ENV ======
 const PORT = process.env.PORT || 3000;
@@ -70,6 +74,7 @@ const sheets = google.sheets({ version: 'v4', auth });
 
 // ====== EXPRESS APP ======
 const app = express();
+const upload = multer({ dest: '/tmp' });
 
 // CORS : en dev on autorise tout, en prod tu pourras restreindre à ton domaine Pressero
 app.use(cors());
@@ -549,10 +554,16 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
 const presseroTokenCache = new Map(); // key: adminUrl => { token, expiresAt }
 
 function normalizeSiteDomain(siteDomain) {
-  const raw = String(siteDomain || '').trim();
-  // si on reçoit "equipe3.ams.v6.pressero.com" -> "equipe3"
-  return raw.split('.')[0];
+  if (!siteDomain) return '';
+  let raw = String(siteDomain).trim();
+
+  // accepte "https://monsite.com/..." → "monsite.com"
+  raw = raw.replace(/^https?:\/\//i, '');
+  raw = raw.replace(/\/.*$/, ''); // coupe tout ce qu'il y a après le host
+
+  return raw;
 }
+
 
 async function getPresseroToken(adminUrl) {
   const key = String(adminUrl || '').trim();
@@ -605,23 +616,42 @@ async function getPresseroToken(adminUrl) {
 
 async function callPressero(adminUrl, path, method, body) {
   const token = await getPresseroToken(adminUrl);
+
   const url = `https://${adminUrl}${path}`;
 
-  const res = await fetch(url, {
-    method: method || 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `token ${token}`
-    },
-    body: JSON.stringify(body || {})
-  });
+  const headers = {
+    Authorization: `token ${token}`
+  };
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(`Pressero ${path} HTTP ${res.status}: ${txt}`);
+  const opts = { method, headers };
+
+  // Cas multipart (form-data)
+  if (body && typeof body.getHeaders === 'function') {
+    Object.assign(headers, body.getHeaders());
+    opts.body = body; // stream form-data
   }
-  return res.json();
+  // Cas JSON
+  else if (body !== undefined && body !== null && method !== 'GET') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+
+  const r = await fetch(url, opts);
+  const text = await r.text();
+
+  let json;
+  try { json = text ? JSON.parse(text) : null; } catch (e) { json = { rawText: text }; }
+
+  if (!r.ok) {
+    const err = new Error(`Pressero API error ${r.status}`);
+    err.status = r.status;
+    err.payload = json;
+    throw err;
+  }
+
+  return json;
 }
+
 // ===================== ADMIN - OPTIONS PRESSERO =====================
 app.post('/admin/pressero/options', async (req, res) => {
   try {
@@ -671,6 +701,165 @@ app.post('/admin/pressero/price', async (req, res) => {
     return res.status(500).json({ error: 'Error loading Pressero price', details: err.message });
   }
 });
+
+function pickHostKind(items) {
+  // ordre imposé : livret > pochette > patron
+  const order = ['livret', 'pochette', 'patron'];
+  for (const k of order) {
+    const found = items.find(x => (x.kind || '').toLowerCase() === k);
+    if (found) return found;
+  }
+  return items[0] || null;
+}
+
+// 1) GET CART (proxy)
+app.post('/admin/pressero/cart/get', async (req, res) => {
+  try {
+    const { adminUrl, siteDomain, siteUserId } = req.body || {};
+    const sd = normalizeSiteDomain(siteDomain);
+
+    if (!adminUrl || !sd || !siteUserId) {
+      return res.status(400).json({ ok: false, error: 'adminUrl/siteDomain/siteUserId required' });
+    }
+
+    const raw = await callPressero(
+      adminUrl,
+      `/api/cart/${encodeURIComponent(sd)}/?userId=${encodeURIComponent(siteUserId)}`,
+      'GET'
+    );
+
+    return res.json({ ok: true, raw });
+  } catch (e) {
+    console.error('[CART/get] error', e);
+    return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
+  }
+});
+
+// 2) ADD ONE ITEM (proxy)
+app.post('/admin/pressero/cart/add-item', async (req, res) => {
+  try {
+    const { adminUrl, siteDomain, siteUserId, cartId, itemBody } = req.body || {};
+    const sd = normalizeSiteDomain(siteDomain);
+
+    if (!adminUrl || !sd || !siteUserId || !itemBody) {
+      return res.status(400).json({ ok: false, error: 'adminUrl/siteDomain/siteUserId/itemBody required' });
+    }
+
+    let cid = cartId;
+    if (!cid) {
+      const cart = await callPressero(
+        adminUrl,
+        `/api/cart/${encodeURIComponent(sd)}/?userId=${encodeURIComponent(siteUserId)}`,
+        'GET'
+      );
+      cid = cart?.Id;
+    }
+
+    if (!cid) {
+      return res.status(400).json({ ok: false, error: 'Unable to resolve cartId' });
+    }
+
+    const raw = await callPressero(
+      adminUrl,
+      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cid)}/item/?userId=${encodeURIComponent(siteUserId)}`,
+      'POST',
+      itemBody
+    );
+
+    // On tente d’extraire un itemId (selon réponse Pressero)
+    const itemId = raw?.ItemId || raw?.itemId || raw?.Id || raw?.id || null;
+
+    return res.json({ ok: true, cartId: cid, itemId, raw });
+  } catch (e) {
+    console.error('[CART/add-item] error', e);
+    return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
+  }
+});
+
+// 3) ADD BUNDLE (3 items) + renvoie hostItemId selon règle livret>pochette>patron
+app.post('/admin/pressero/cart/add-bundle', async (req, res) => {
+  try {
+    const { adminUrl, siteDomain, siteUserId, cartId, items } = req.body || {};
+    const sd = normalizeSiteDomain(siteDomain);
+
+    if (!adminUrl || !sd || !siteUserId || !Array.isArray(items) || !items.length) {
+      return res.status(400).json({ ok: false, error: 'adminUrl/siteDomain/siteUserId/items[] required' });
+    }
+
+    // resolve cartId
+    let cid = cartId;
+    if (!cid) {
+      const cart = await callPressero(
+        adminUrl,
+        `/api/cart/${encodeURIComponent(sd)}/?userId=${encodeURIComponent(siteUserId)}`,
+        'GET'
+      );
+      cid = cart?.Id;
+    }
+
+    if (!cid) {
+      return res.status(400).json({ ok: false, error: 'Unable to resolve cartId' });
+    }
+
+    const added = [];
+    for (const it of items) {
+      if (!it || !it.itemBody) continue;
+
+      const raw = await callPressero(
+        adminUrl,
+        `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cid)}/item/?userId=${encodeURIComponent(siteUserId)}`,
+        'POST',
+        it.itemBody
+      );
+
+      const itemId = raw?.ItemId || raw?.itemId || raw?.Id || raw?.id || null;
+      added.push({ kind: it.kind || '', itemId, raw });
+    }
+
+    const host = pickHostKind(added.filter(x => x.itemId));
+    const hostItemId = host ? host.itemId : null;
+
+    return res.json({ ok: true, cartId: cid, added, hostItemId });
+  } catch (e) {
+    console.error('[CART/add-bundle] error', e);
+    return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
+  }
+});
+
+// 4) SET ITEM FILE (upload ZIP) -> l’attache à l’item hôte
+// Front envoie multipart/form-data : fields adminUrl/siteDomain/siteUserId/cartId/cartItemId + file
+app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, res) => {
+  try {
+    const { adminUrl, siteDomain, siteUserId, cartId, cartItemId } = req.body || {};
+    const sd = normalizeSiteDomain(siteDomain);
+
+    if (!adminUrl || !sd || !siteUserId || !cartId || !cartItemId) {
+      return res.status(400).json({ ok: false, error: 'adminUrl/siteDomain/siteUserId/cartId/cartItemId required' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ ok: false, error: 'file is required (multipart field name = file)' });
+    }
+
+    const form = new FormData();
+    form.append('file', fs.createReadStream(req.file.path), {
+      filename: req.file.originalname || 'upload.zip',
+      contentType: req.file.mimetype || 'application/zip'
+    });
+
+    const raw = await callPressero(
+      adminUrl,
+      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}/item/${encodeURIComponent(cartItemId)}/file/?userId=${encodeURIComponent(siteUserId)}`,
+      'PUT',
+      form
+    );
+
+    return res.json({ ok: true, raw });
+  } catch (e) {
+    console.error('[CART/item-file] error', e);
+    return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
+  }
+});
+
 
 
 // ===================== HEALTHCHECK =====================
