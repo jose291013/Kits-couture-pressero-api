@@ -805,15 +805,55 @@ app.post('/admin/pressero/cart/add-bundle', async (req, res) => {
     for (const it of items) {
       if (!it || !it.itemBody) continue;
 
-      const raw = await callPressero(
-        adminUrl,
-        `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cid)}/item/?userId=${encodeURIComponent(siteUserId)}`,
-        'POST',
-        it.itemBody
-      );
+      let raw = null;
 
-      const itemId = raw?.ItemId || raw?.itemId || raw?.Id || raw?.id || null;
-      added.push({ kind: it.kind || '', itemId, raw });
+try {
+  raw = await callPressero(
+    adminUrl,
+    `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cid)}/item/?userId=${encodeURIComponent(siteUserId)}`,
+    'POST',
+    it.itemBody
+  );
+} catch (e) {
+  // ✅ Cas Pressero: 400 mais item créé + warning
+  if (e?.status === 400 && e?.payload?.Message === 'ReOrderFullSuccess_PriceWarning') {
+    raw = e.payload;
+    raw.__warning = 'ReOrderFullSuccess_PriceWarning';
+  } else {
+    throw e;
+  }
+}
+
+// Essayer de récupérer l'ItemId depuis la réponse
+let itemId = raw?.ItemId || raw?.itemId || raw?.Id || raw?.id || null;
+
+// Si on a eu un warning et pas d'ItemId → on refetch le cart pour retrouver l’item
+if (!itemId && raw?.Message === 'ReOrderFullSuccess_PriceWarning') {
+  const cartAfter = await callPressero(
+    adminUrl,
+    `/api/cart/${encodeURIComponent(sd)}/?userId=${encodeURIComponent(siteUserId)}`,
+    'GET'
+  );
+
+  const productId = it?.itemBody?.ProductId || it?.itemBody?.productId;
+  const itemName = it?.itemBody?.ItemName || it?.itemBody?.itemName;
+
+  const found = (cartAfter?.Items || [])
+    .slice()
+    .reverse()
+    .find(x =>
+      String(x.ProductId || '').toLowerCase() === String(productId || '').toLowerCase() &&
+      (!itemName || String(x.ItemName || '') === String(itemName))
+    );
+
+  if (found?.ItemId) {
+    itemId = found.ItemId;
+    raw.__resolvedFromCart = true;
+  }
+}
+
+added.push({ kind: it.kind || '', itemId, raw });
+
     }
 
     const host = pickHostKind(added.filter(x => x.itemId));
