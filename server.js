@@ -653,32 +653,21 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
   const host = normalizeHost(adminUrl);
   if (!host) throw new Error('adminUrl invalide');
 
-  // URL + query
   const qs = new URLSearchParams(query || {}).toString();
-  let url = `https://${host}${path}`;
-  if (qs) url += (url.includes('?') ? '&' : '?') + qs;
+  const url = `https://${host}${path}${qs ? (path.includes('?') ? `&${qs}` : `?${qs}`) : ''}`;
 
-  // Base headers ✅
-  const h = {
-    Accept: 'application/json',
-    ...headers
-  };
+  const h = { Accept: 'application/json', ...headers };
 
-  // Body (JSON ou FormData)
-  let requestBody = undefined;
+  let requestBody;
   let extraHeaders = {};
 
-  if (body != null) {
-    // form-data (lib) => multipart, il faut inclure les headers boundary
-    if (typeof body.getHeaders === 'function') {
-      requestBody = body;
-      extraHeaders = body.getHeaders();
-    } else if (typeof body === 'string' || Buffer.isBuffer(body)) {
-      requestBody = body;
-    } else {
-      h['Content-Type'] = 'application/json';
-      requestBody = JSON.stringify(body);
-    }
+  // Support FormData (form-data lib)
+  if (body != null && typeof body.getHeaders === 'function') {
+    requestBody = body;
+    extraHeaders = body.getHeaders();
+  } else if (body != null) {
+    h['Content-Type'] = 'application/json';
+    requestBody = JSON.stringify(body);
   }
 
   const isCartApi = String(path).startsWith('/api/cart/');
@@ -694,14 +683,14 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
   }
 
   const doFetch = async (useAuth) => {
-    const hh = { ...h, ...extraHeaders }; // ✅ pas de "{ .h }"
+    const hh = { ...h, ...extraHeaders };
     if (useAuth && token) hh.Authorization = `Bearer ${token}`;
     return fetch(url, { method, headers: hh, body: requestBody });
   };
 
   let res = await doFetch(shouldUseAuth);
 
-  // Si on a tenté avec auth et que ça 401, retry sans Authorization
+  // Si auth -> 401, retry sans Authorization
   if (shouldUseAuth && res.status === 401) {
     console.warn('[PRESSEERO] 401 with auth, retrying without Authorization:', url);
     res = await doFetch(false);
@@ -720,6 +709,7 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
 
   return data;
 }
+
 
 
 
