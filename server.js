@@ -550,30 +550,41 @@ app.post('/admin/pjm/optionsandprice', async (req, res) => {
   }
 });
 
-// ====== Pressero token cache (par adminUrl) ======
-const presseroTokenCache = new Map(); // key: adminUrl => { token, expiresAt }
+// ====== Pressero helpers ======
+
+function normalizeHost(input) {
+  const s = String(input || '').trim();
+  if (!s) return '';
+  try {
+    const u = new URL(s);
+    return u.host;
+  } catch {
+    // si c’est déjà un host ou une URL “sans protocole”
+    return s
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/.*$/, '')     // coupe tout après le host
+      .replace(/\/+$/, '');
+  }
+}
+
+// ✅ UNE SEULE déclaration
+const presseroTokenCache = new Map(); // key: host => { token, expiresAt }
 
 function normalizeSiteDomain(siteDomain) {
   if (!siteDomain) return '';
   let raw = String(siteDomain).trim();
-
-  // accepte "https://monsite.com/..." → "monsite.com"
   raw = raw.replace(/^https?:\/\//i, '');
-  raw = raw.replace(/\/.*$/, ''); // coupe tout ce qu'il y a après le host
-
+  raw = raw.replace(/\/.*$/, '');
   return raw;
 }
 
-
 async function getPresseroToken(adminUrl) {
-  const key = String(adminUrl || '').trim();
-  if (!key) throw new Error('adminUrl manquant');
+  const host = normalizeHost(adminUrl);
+  if (!host) throw new Error('adminUrl manquant');
 
   const now = Date.now();
-  const cached = presseroTokenCache.get(key);
-  if (cached && cached.token && cached.expiresAt > now + 60_000) {
-    return cached.token;
-  }
+  const cached = presseroTokenCache.get(host);
+  if (cached && cached.token && cached.expiresAt > now + 60_000) return cached.token;
 
   const username = process.env.PRESSERO_ADMIN_USER;
   const password = process.env.PRESSERO_ADMIN_PASSWORD;
@@ -584,13 +595,12 @@ async function getPresseroToken(adminUrl) {
     throw new Error('Pressero credentials (env) manquants');
   }
 
-  const url = `https://${key}/api/v2/Authentication`;
+  const url = `https://${host}/api/v2/Authentication`;
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      // ⚠️ garde exactement les noms de champs que tu utilises dans Postman
       Username: username,
       Password: password,
       SubscriberId: subscriberId,
@@ -607,23 +617,121 @@ async function getPresseroToken(adminUrl) {
   const token = data && (data.Token || data.token);
   if (!token) throw new Error('Token Pressero manquant dans la réponse');
 
-  // si Pressero renvoie une durée, utilise-la ; sinon 25 min par défaut
-  const durationMin = data.TokenDuration || data.tokenDuration || 25;
-  presseroTokenCache.set(key, { token, expiresAt: now + durationMin * 60_000 });
+  const durationMin = Number(data.TokenDuration || data.tokenDuration || 25);
+  presseroTokenCache.set(host, {
+    token,
+    expiresAt: now + (isFinite(durationMin) ? durationMin : 25) * 60_000
+  });
 
   return token;
 }
 
-async function callPressero({ adminUrl, path, method = 'GET', query = {}, body = null, headers = {} }) {
+/**
+ * ✅ Supporte 2 signatures :
+ *  - callPressero({ adminUrl, path, method, body, query, headers, forceAuth })
+ *  - callPressero(adminUrl, path, method, body, query, headers, forceAuth)
+ */
+async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg = null, queryArg = {}, headersArg = {}, forceAuthArg = false) {
+  const opts =
+    adminUrlOrOpts && typeof adminUrlOrOpts === 'object'
+      ? adminUrlOrOpts
+      : {
+          adminUrl: adminUrlOrOpts,
+          path: pathArg,
+          method: methodArg,
+          body: bodyArg,
+          query: queryArg,
+          headers: headersArg,
+          forceAuth: forceAuthArg
+        };
+
+  const { adminUrl, path, method = 'GET', query = {}, body = null, headers = {}, forceAuth = false } = opts;
+
   if (!adminUrl) throw new Error('adminUrl manquant');
   if (!path) throw new Error('path manquant');
 
-  const base = String(adminUrl).trim().startsWith('http')
-    ? String(adminUrl).trim()
-    : `https://${String(adminUrl).trim()}`;
+  const host = normalizeHost(adminUrl);
+  if (!host) throw new Error('adminUrl invalide');
+
+  // URL + query
+  const qs = new URLSearchParams(query || {}).toString();
+  let url = `https://${host}${path}`;
+  if (qs) url += (url.includes('?') ? '&' : '?') + qs;
+
+  // Base headers ✅
+  const h = {
+    Accept: 'application/json',
+    ...headers
+  };
+
+  // Body (JSON ou FormData)
+  let requestBody = undefined;
+  let extraHeaders = {};
+
+  if (body != null) {
+    // form-data (lib) => multipart, il faut inclure les headers boundary
+    if (typeof body.getHeaders === 'function') {
+      requestBody = body;
+      extraHeaders = body.getHeaders();
+    } else if (typeof body === 'string' || Buffer.isBuffer(body)) {
+      requestBody = body;
+    } else {
+      h['Content-Type'] = 'application/json';
+      requestBody = JSON.stringify(body);
+    }
+  }
+
+  const isCartApi = String(path).startsWith('/api/cart/');
+  const shouldUseAuth = forceAuth || !isCartApi;
+
+  let token = null;
+  if (shouldUseAuth) {
+    try {
+      token = await getPresseroToken(adminUrl);
+    } catch (e) {
+      console.warn('[PRESSEERO] token unavailable:', e.message);
+    }
+  }
+
+  const doFetch = async (useAuth) => {
+    const hh = { ...h, ...extraHeaders }; // ✅ pas de "{ .h }"
+    if (useAuth && token) hh.Authorization = `Bearer ${token}`;
+    return fetch(url, { method, headers: hh, body: requestBody });
+  };
+
+  let res = await doFetch(shouldUseAuth);
+
+  // Si on a tenté avec auth et que ça 401, retry sans Authorization
+  if (shouldUseAuth && res.status === 401) {
+    console.warn('[PRESSEERO] 401 with auth, retrying without Authorization:', url);
+    res = await doFetch(false);
+  }
+
+  const text = await res.text().catch(() => '');
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch {}
+
+  if (!res.ok) {
+    const err = new Error(`Pressero API error ${res.status}`);
+    err.status = res.status;
+    err.payload = data || { raw: text };
+    throw err;
+  }
+
+  return data;
+}
+
+
+
+async function callPressero({ adminUrl, path, method = 'GET', query = {}, body = null, headers = {}, forceAuth = false }) {
+  if (!adminUrl) throw new Error('adminUrl manquant');
+  if (!path) throw new Error('path manquant');
+
+  const host = normalizeHost(adminUrl);
+  if (!host) throw new Error('adminUrl invalide');
 
   const qs = new URLSearchParams(query || {}).toString();
-  const url = `${base}${path}${qs ? `?${qs}` : ''}`;
+  const url = `https://${host}${path}${qs ? `?${qs}` : ''}`;
 
   // Base headers
   const h = {
@@ -638,30 +746,43 @@ async function callPressero({ adminUrl, path, method = 'GET', query = {}, body =
     requestBody = JSON.stringify(body);
   }
 
-  // 1) tentative AVEC token (si dispo)
+  // 🎯 Règle: /api/cart = PAS d’auth (sauf si on force)
+  const isCartApi = String(path).startsWith('/api/cart/');
+  const shouldUseAuth = forceAuth || !isCartApi;
+
+  // Récup token seulement si nécessaire
   let token = null;
-  try {
-    token = await getPresseroToken(adminUrl);
-  } catch (e) {
-    console.warn('[PRESSEERO] token skipped:', e.message);
+  if (shouldUseAuth) {
+    try {
+      token = await getPresseroToken(adminUrl);
+    } catch (e) {
+      console.warn('[PRESSEERO] token unavailable:', e.message);
+    }
   }
 
-  const tryFetch = async (useAuth) => {
+  const doFetch = async (useAuth) => {
     const hh = { ...h };
+
     if (useAuth && token) {
-      // ⚠️ important : Bearer est le format le plus standard
-      hh.Authorization = `Bearer ${token}`;
+      // on met les 2 formats pour être tolérant selon implémentations
+      hh.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      hh['X-Authorization'] = token;
     }
+
     return fetch(url, { method, headers: hh, body: requestBody });
   };
 
   // Essai 1
-  let res = await tryFetch(true);
+  let res = await doFetch(shouldUseAuth);
 
-  // 2) si 401 → retry SANS Authorization (important pour /api/cart/ qui peut marcher sans auth)
-  if (res.status === 401) {
-    console.warn('[PRESSEERO] 401 with auth, retrying without Authorization:', url);
-    res = await tryFetch(false);
+  // Si 401 sur un endpoint auth → refresh token + retry 1 fois
+  if (res.status === 401 && shouldUseAuth) {
+    console.warn('[PRESSEERO] 401, retry after token refresh:', url);
+    presseroTokenCache.delete(host);
+    try {
+      token = await getPresseroToken(adminUrl);
+    } catch (e) {}
+    res = await doFetch(!!token);
   }
 
   // Parse réponse
@@ -669,6 +790,7 @@ async function callPressero({ adminUrl, path, method = 'GET', query = {}, body =
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch (e) {}
 
+  // Si erreur, throw
   if (!res.ok) {
     const err = new Error(`Pressero API error ${res.status}`);
     err.status = res.status;
@@ -678,7 +800,6 @@ async function callPressero({ adminUrl, path, method = 'GET', query = {}, body =
 
   return data;
 }
-
 
 // ===================== ADMIN - OPTIONS PRESSERO =====================
 app.post('/admin/pressero/options', async (req, res) => {
