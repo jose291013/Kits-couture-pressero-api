@@ -601,11 +601,11 @@ async function getPresseroToken(adminUrl) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      Username: username,
-      Password: password,
-      SubscriberId: subscriberId,
-      ConsumerId: consumerId
-    })
+  UserName: username,
+  Password: password,
+  SubscriberID: subscriberId,
+  ConsumerID: consumerId
+})
   });
 
   if (!res.ok) {
@@ -679,8 +679,7 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
     requestBody = JSON.stringify(body);
   }
 
-  const isCartApi = String(path).startsWith('/api/cart/');
-  const shouldUseAuth = forceAuth || !isCartApi;
+  const shouldUseAuth = true;
 
   let token = null;
   if (shouldUseAuth) {
@@ -693,7 +692,15 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
 
   const doFetch = async (useAuth) => {
     const hh = { ...h, ...extraHeaders };
-    if (useAuth && token) hh.Authorization = `Bearer ${token}`;
+    if (useAuth && token) {
+  const authVal =
+    token.startsWith('token ') || token.startsWith('Bearer ')
+      ? token
+      : `token ${token}`;
+
+  hh.Authorization = authVal;
+}
+
     return fetch(url, { method, headers: hh, body: requestBody });
   };
 
