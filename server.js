@@ -632,6 +632,7 @@ async function getPresseroToken(adminUrl) {
  *  - callPressero(adminUrl, path, method, body, query, headers, forceAuth)
  */
 async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg = null, queryArg = {}, headersArg = {}, forceAuthArg = false) {
+  // ✅ Supporte: callPressero({ ... }) ET callPressero(adminUrl, path, method, body, query, headers, forceAuth)
   const opts =
     adminUrlOrOpts && typeof adminUrlOrOpts === 'object'
       ? adminUrlOrOpts
@@ -645,7 +646,15 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
           forceAuth: forceAuthArg
         };
 
-  const { adminUrl, path, method = 'GET', query = {}, body = null, headers = {}, forceAuth = false } = opts;
+  const {
+    adminUrl,
+    path,
+    method = 'GET',
+    query = {},
+    body = null,
+    headers = {},
+    forceAuth = false
+  } = opts;
 
   if (!adminUrl) throw new Error('adminUrl manquant');
   if (!path) throw new Error('path manquant');
