@@ -614,43 +614,71 @@ async function getPresseroToken(adminUrl) {
   return token;
 }
 
-async function callPressero(adminUrl, path, method, body) {
-  const token = await getPresseroToken(adminUrl);
+async function callPressero({ adminUrl, path, method = 'GET', query = {}, body = null, headers = {} }) {
+  if (!adminUrl) throw new Error('adminUrl manquant');
+  if (!path) throw new Error('path manquant');
 
-  const url = `https://${adminUrl}${path}`;
+  const base = String(adminUrl).trim().startsWith('http')
+    ? String(adminUrl).trim()
+    : `https://${String(adminUrl).trim()}`;
 
-  const headers = {
-    Authorization: `token ${token}`
+  const qs = new URLSearchParams(query || {}).toString();
+  const url = `${base}${path}${qs ? `?${qs}` : ''}`;
+
+  // Base headers
+  const h = {
+    Accept: 'application/json',
+    ...headers
   };
 
-  const opts = { method, headers };
-
-  // Cas multipart (form-data)
-  if (body && typeof body.getHeaders === 'function') {
-    Object.assign(headers, body.getHeaders());
-    opts.body = body; // stream form-data
-  }
-  // Cas JSON
-  else if (body !== undefined && body !== null && method !== 'GET') {
-    headers['Content-Type'] = 'application/json';
-    opts.body = JSON.stringify(body);
+  // JSON body
+  let requestBody;
+  if (body != null) {
+    h['Content-Type'] = 'application/json';
+    requestBody = JSON.stringify(body);
   }
 
-  const r = await fetch(url, opts);
-  const text = await r.text();
+  // 1) tentative AVEC token (si dispo)
+  let token = null;
+  try {
+    token = await getPresseroToken(adminUrl);
+  } catch (e) {
+    console.warn('[PRESSEERO] token skipped:', e.message);
+  }
 
-  let json;
-  try { json = text ? JSON.parse(text) : null; } catch (e) { json = { rawText: text }; }
+  const tryFetch = async (useAuth) => {
+    const hh = { ...h };
+    if (useAuth && token) {
+      // ⚠️ important : Bearer est le format le plus standard
+      hh.Authorization = `Bearer ${token}`;
+    }
+    return fetch(url, { method, headers: hh, body: requestBody });
+  };
 
-  if (!r.ok) {
-    const err = new Error(`Pressero API error ${r.status}`);
-    err.status = r.status;
-    err.payload = json;
+  // Essai 1
+  let res = await tryFetch(true);
+
+  // 2) si 401 → retry SANS Authorization (important pour /api/cart/ qui peut marcher sans auth)
+  if (res.status === 401) {
+    console.warn('[PRESSEERO] 401 with auth, retrying without Authorization:', url);
+    res = await tryFetch(false);
+  }
+
+  // Parse réponse
+  const text = await res.text().catch(() => '');
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) {}
+
+  if (!res.ok) {
+    const err = new Error(`Pressero API error ${res.status}`);
+    err.status = res.status;
+    err.payload = data || { raw: text };
     throw err;
   }
 
-  return json;
+  return data;
 }
+
 
 // ===================== ADMIN - OPTIONS PRESSERO =====================
 app.post('/admin/pressero/options', async (req, res) => {
