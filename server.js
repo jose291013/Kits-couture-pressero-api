@@ -970,61 +970,66 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
     const filename = req.file.originalname || 'upload.zip';
     const mimetype = req.file.mimetype || 'application/zip';
 
-    // ✅ IMPORTANT: recréer un FormData à CHAQUE tentative (sinon stream consommé)
-    // ✅ IMPORTANT: recréer un FormData à CHAQUE tentative (sinon stream consommé)
-const makeForm = (fieldName, repeat = 1) => {
-  const form = new FormData();
+    // ✅ recréer un FormData à CHAQUE tentative (sinon stream consommé)
+    const makeForm = (fieldName, repeat = 1) => {
+      const form = new FormData();
+      for (let i = 0; i < repeat; i++) {
+        form.append(fieldName, fs.createReadStream(tmpPath), {
+          filename,
+          contentType: mimetype
+        });
+      }
+      return form;
+    };
 
-  for (let i = 0; i < repeat; i++) {
-    // ⚠️ champ vide possible (name="")
-    form.append(fieldName, fs.createReadStream(tmpPath), {
-      filename,
-      contentType: mimetype
-    });
-  }
+    // ✅ (Re)définir base + query + lastErr (c’était ce qui manquait => "base is not defined")
+    const base =
+      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
+      `/item/${encodeURIComponent(cartItemId)}/file`;
 
-  return form;
-};
+    const query = {
+      userId: siteUserId
+      // tu peux ajouter fileName si besoin sur ton environnement :
+      // fileName: filename
+    };
 
-// ...
+    let lastErr = null;
 
-// ✅ Variantes testées : slash final + nom de champ file/files/"" + 1 ou 2 fichiers
-const attempts = [
-  { path: `${base}/`, field: 'file',  repeat: 1 },
-  { path: `${base}`,  field: 'file',  repeat: 1 },
-  { path: `${base}/`, field: 'files', repeat: 1 },
-  { path: `${base}`,  field: 'files', repeat: 1 },
+    // ✅ Variantes (slash final + nom de champ file/files + copie Postman key="")
+    const attempts = [
+      { path: `${base}/`, field: 'file',  repeat: 1 },
+      { path: `${base}`,  field: 'file',  repeat: 1 },
+      { path: `${base}/`, field: 'files', repeat: 1 },
+      { path: `${base}`,  field: 'files', repeat: 1 },
 
-  // 👇 copies “Postman export” (2 files, key vide)
-  { path: `${base}/`, field: '', repeat: 2 },
-  { path: `${base}`,  field: '', repeat: 2 },
+      // Postman export: 2 files, key vide (name="")
+      { path: `${base}/`, field: '', repeat: 2 },
+      { path: `${base}`,  field: '', repeat: 2 },
 
-  // 👇 au cas où Pressero accepte key vide mais 1 seul fichier
-  { path: `${base}/`, field: '', repeat: 1 },
-  { path: `${base}`,  field: '', repeat: 1 }
-];
+      // au cas où key vide mais 1 seul fichier
+      { path: `${base}/`, field: '', repeat: 1 },
+      { path: `${base}`,  field: '', repeat: 1 }
+    ];
 
-for (const a of attempts) {
-  try {
-    const raw = await callPressero({
-      adminUrl,
-      path: a.path,
-      method: 'PUT',
-      body: makeForm(a.field, a.repeat),
-      query,
-      forceAuth: true
-    });
+    for (const a of attempts) {
+      try {
+        const raw = await callPressero({
+          adminUrl,
+          path: a.path,
+          method: 'PUT',
+          body: makeForm(a.field, a.repeat),
+          query,
+          forceAuth: true
+        });
 
-    return res.json({ ok: true, raw, used: a });
-  } catch (e) {
-    lastErr = e;
-    if (e && e.status === 404) continue;
-    throw e;
-  }
-}
+        return res.json({ ok: true, raw, used: a });
+      } catch (e) {
+        lastErr = e;
+        if (e && e.status === 404) continue; // test variante suivante
+        throw e; // sinon stop (401/400/500)
+      }
+    }
 
-
-    // Si tout a échoué
     throw lastErr || new Error('Upload failed: no attempt succeeded');
   } catch (e) {
     console.error('[CART/item-file] error', e);
@@ -1034,12 +1039,12 @@ for (const a of attempts) {
       payload: e?.payload || null
     });
   } finally {
-    // cleanup fichier temporaire multer
     if (tmpPath) {
       try { fs.unlinkSync(tmpPath); } catch {}
     }
   }
 });
+
 
 
 // ===================== HEALTHCHECK =====================
