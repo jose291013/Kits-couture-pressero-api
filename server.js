@@ -900,10 +900,12 @@ try {
 }
 
 // Essayer de récupérer l'ItemId depuis la réponse
-let itemId = raw?.ItemId || raw?.itemId || raw?.Id || raw?.id || null;
+// Essayer de récupérer l'ItemId depuis la réponse
+let itemId = raw?.ItemId || raw?.itemId || null;
 
-// Si on a eu un warning et pas d'ItemId → on refetch le cart pour retrouver l’item
-if (!itemId && raw?.Message === 'ReOrderFullSuccess_PriceWarning') {
+// ⚠️ Certains retours Pressero donnent un "Id" qui est le cartId, pas l'itemId.
+// Donc si itemId est vide, on le résout via un GET cart.
+if (!itemId) {
   const cartAfter = await callPressero(
     adminUrl,
     `/api/cart/${encodeURIComponent(sd)}/?userId=${encodeURIComponent(siteUserId)}`,
@@ -921,11 +923,10 @@ if (!itemId && raw?.Message === 'ReOrderFullSuccess_PriceWarning') {
       (!itemName || String(x.ItemName || '') === String(itemName))
     );
 
-  if (found?.ItemId) {
-    itemId = found.ItemId;
-    raw.__resolvedFromCart = true;
-  }
+  // selon structure, l'id peut être ItemId ou Id
+  itemId = found?.ItemId || found?.Id || null;
 }
+
 
 added.push({ kind: it.kind || '', itemId, raw });
 
@@ -955,41 +956,60 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
       return res.status(400).json({ ok: false, error: 'file is required (multipart field name = file)' });
     }
 
+    const filename = req.file.originalname || 'upload.zip';
+    const mimetype = req.file.mimetype || 'application/zip';
+
+    // Pressero "Set Item Files" (Postman) est bien /file + form-data.
+    // On envoie à la fois "file" et "files" pour couvrir les variantes.
     const form = new FormData();
-    form.append('file', fs.createReadStream(req.file.path), {
-      filename: req.file.originalname || 'upload.zip',
-      contentType: req.file.mimetype || 'application/zip'
-    });
+    form.append('file', fs.createReadStream(req.file.path), { filename, contentType: mimetype });
+    form.append('files', fs.createReadStream(req.file.path), { filename, contentType: mimetype });
 
     const base =
-  `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
-  `/item/${encodeURIComponent(cartItemId)}/file`;
+      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
+      `/item/${encodeURIComponent(cartItemId)}/file`;
 
-const qs = `?userId=${encodeURIComponent(siteUserId)}`;
+    const query = {
+      userId: siteUserId,
+      fileName: filename // certains environnements le demandent implicitement
+    };
 
-let raw;
+    let raw;
+    try {
+      // essai 1: /file/
+      raw = await callPressero({
+        adminUrl,
+        path: `${base}/`,
+        method: 'PUT',
+        body: form,
+        query,
+        forceAuth: true // ✅ upload fichier souvent protégé
+      });
+    } catch (e) {
+      // essai 2: /file
+      if (e && e.status === 404) {
+        raw = await callPressero({
+          adminUrl,
+          path: base,
+          method: 'PUT',
+          body: form,
+          query,
+          forceAuth: true
+        });
+      } else {
+        throw e;
+      }
+    } finally {
+      // cleanup fichier temporaire multer
+      try { fs.unlinkSync(req.file.path); } catch {}
+    }
 
-try {
-  // Essai 1 : avec slash final (file/?userId=...)
-  raw = await callPressero(adminUrl, `${base}/` + qs, 'PUT', form);
-} catch (e) {
-  // Si 404 -> Essai 2 : sans slash final (file?userId=...)
-  if (e && e.status === 404) {
-    raw = await callPressero(adminUrl, `${base}` + qs, 'PUT', form);
-  } else {
-    throw e;
-  }
-}
-
-return res.json({ ok: true, raw });
-
+    return res.json({ ok: true, raw });
   } catch (e) {
     console.error('[CART/item-file] error', e);
     return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
   }
 });
-
-
 
 // ===================== HEALTHCHECK =====================
 app.get('/health', (req, res) => {
