@@ -961,14 +961,28 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
       contentType: req.file.mimetype || 'application/zip'
     });
 
-    const raw = await callPressero(
-      adminUrl,
-      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}/item/${encodeURIComponent(cartItemId)}/file/?userId=${encodeURIComponent(siteUserId)}`,
-      'PUT',
-      form
-    );
+    const base =
+  `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
+  `/item/${encodeURIComponent(cartItemId)}/file`;
 
-    return res.json({ ok: true, raw });
+const qs = `?userId=${encodeURIComponent(siteUserId)}`;
+
+let raw;
+
+try {
+  // Essai 1 : avec slash final (file/?userId=...)
+  raw = await callPressero(adminUrl, `${base}/` + qs, 'PUT', form);
+} catch (e) {
+  // Si 404 -> Essai 2 : sans slash final (file?userId=...)
+  if (e && e.status === 404) {
+    raw = await callPressero(adminUrl, `${base}` + qs, 'PUT', form);
+  } else {
+    throw e;
+  }
+}
+
+return res.json({ ok: true, raw });
+
   } catch (e) {
     console.error('[CART/item-file] error', e);
     return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
