@@ -942,74 +942,103 @@ added.push({ kind: it.kind || '', itemId, raw });
   }
 });
 
-// 4) SET ITEM FILE (upload ZIP) -> l’attache à l’item hôte
-// Front envoie multipart/form-data : fields adminUrl/siteDomain/siteUserId/cartId/cartItemId + file
+/// 4) SET ITEM FILE (upload ZIP) -> l’attache à l’item hôte
+// Front envoie multipart/form-data : adminUrl/siteDomain/siteUserId/cartId/cartItemId + file
 app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, res) => {
+  let tmpPath = null;
+
   try {
     const { adminUrl, siteDomain, siteUserId, cartId, cartItemId } = req.body || {};
     const sd = normalizeSiteDomain(siteDomain);
 
     if (!adminUrl || !sd || !siteUserId || !cartId || !cartItemId) {
-      return res.status(400).json({ ok: false, error: 'adminUrl/siteDomain/siteUserId/cartId/cartItemId required' });
+      return res.status(400).json({
+        ok: false,
+        error: 'adminUrl/siteDomain/siteUserId/cartId/cartItemId required'
+      });
     }
+
     if (!req.file) {
-      return res.status(400).json({ ok: false, error: 'file is required (multipart field name = file)' });
+      return res.status(400).json({
+        ok: false,
+        error: 'file is required (multipart field name = file)'
+      });
     }
+
+    tmpPath = req.file.path;
 
     const filename = req.file.originalname || 'upload.zip';
     const mimetype = req.file.mimetype || 'application/zip';
 
-    // Pressero "Set Item Files" (Postman) est bien /file + form-data.
-    // On envoie à la fois "file" et "files" pour couvrir les variantes.
-    const form = new FormData();
-    form.append('file', fs.createReadStream(req.file.path), { filename, contentType: mimetype });
-    form.append('files', fs.createReadStream(req.file.path), { filename, contentType: mimetype });
+    // ✅ IMPORTANT: recréer un FormData à CHAQUE tentative (sinon stream consommé)
+    const makeForm = (fieldName) => {
+      const form = new FormData();
+      form.append(fieldName, fs.createReadStream(tmpPath), {
+        filename,
+        contentType: mimetype
+      });
+      return form;
+    };
 
     const base =
       `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
       `/item/${encodeURIComponent(cartItemId)}/file`;
 
-    const query = {
-      userId: siteUserId,
-      fileName: filename // certains environnements le demandent implicitement
-    };
+    const query = { userId: siteUserId };
 
-    let raw;
-    try {
-      // essai 1: /file/
-      raw = await callPressero({
-        adminUrl,
-        path: `${base}/`,
-        method: 'PUT',
-        body: form,
-        query,
-        forceAuth: true // ✅ upload fichier souvent protégé
-      });
-    } catch (e) {
-      // essai 2: /file
-      if (e && e.status === 404) {
-        raw = await callPressero({
+    // ✅ Variantes testées (slash final + nom de champ file/files)
+    const attempts = [
+      { path: `${base}/`, field: 'file'  },
+      { path: `${base}`,  field: 'file'  },
+      { path: `${base}/`, field: 'files' },
+      { path: `${base}`,  field: 'files' }
+    ];
+
+    let lastErr = null;
+
+    for (const a of attempts) {
+      try {
+        const raw = await callPressero({
           adminUrl,
-          path: base,
+          path: a.path,
           method: 'PUT',
-          body: form,
+          body: makeForm(a.field),
           query,
           forceAuth: true
         });
-      } else {
+
+        return res.json({
+          ok: true,
+          raw,
+          used: { path: a.path, field: a.field }
+        });
+      } catch (e) {
+        lastErr = e;
+        // Si c'est un 404, on tente la variante suivante
+        if (e && e.status === 404) continue;
+
+        // Pour autres erreurs (401/400/500), on stoppe direct (plus utile)
         throw e;
       }
-    } finally {
-      // cleanup fichier temporaire multer
-      try { fs.unlinkSync(req.file.path); } catch {}
     }
 
-    return res.json({ ok: true, raw });
+    // Si tout a échoué
+    throw lastErr || new Error('Upload failed: no attempt succeeded');
   } catch (e) {
     console.error('[CART/item-file] error', e);
-    return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
+    return res.status(500).json({
+      ok: false,
+      error: String(e?.message || e),
+      payload: e?.payload || null
+    });
+  } finally {
+    // cleanup fichier temporaire multer
+    if (tmpPath) {
+      try { fs.unlinkSync(tmpPath); } catch {}
+    }
   }
 });
+
 
 // ===================== HEALTHCHECK =====================
 app.get('/health', (req, res) => {
