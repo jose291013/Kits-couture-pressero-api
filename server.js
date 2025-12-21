@@ -603,7 +603,7 @@ async function getPresseroToken(adminUrl) {
     body: JSON.stringify({
   UserName: username,
   Password: password,
-  SubscriberID: subscriberId,
+  SubscriberId: subscriberId,
   ConsumerID: consumerId
 })
   });
