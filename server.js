@@ -80,6 +80,19 @@ const upload = multer({ dest: '/tmp' });
 app.use(cors());
 app.use(express.json());
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function looksLikeFileAttached(obj, filename) {
+  try {
+    const s = JSON.stringify(obj || {});
+    if (!s) return false;
+    return (filename && s.includes(filename)) || s.toLowerCase().includes('.zip');
+  } catch {
+    return false;
+  }
+}
+
+
 // ===================== HELPERS GOOGLE SHEETS =====================
 
 // Crée l'onglet pour cet email s'il n'existe pas encore
@@ -809,6 +822,19 @@ app.post('/admin/pressero/cart/get', async (req, res) => {
     return res.status(500).json({ ok: false, error: String(e?.message || e), payload: e?.payload || null });
   }
 });
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function looksLikeFileAttached(obj, filename) {
+  try {
+    const s = JSON.stringify(obj || {});
+    if (!s) return false;
+    // check nom exact, et fallback "zip"
+    return (filename && s.includes(filename)) || s.toLowerCase().includes('.zip');
+  } catch {
+    return false;
+  }
+}
+
 
 // 2) ADD ONE ITEM (proxy)
 app.post('/admin/pressero/cart/add-item', async (req, res) => {
@@ -944,14 +970,25 @@ added.push({ kind: it.kind || '', itemId, raw });
 
 /// 4) SET ITEM FILE (upload ZIP) -> l’attache à l’item hôte
 // Front envoie multipart/form-data : adminUrl/siteDomain/siteUserId/cartId/cartItemId + file
+// / 4) SET ITEM FILE (upload ZIP) -> l’attache à l’item hôte
+// Front envoie multipart/form-data : adminUrl/siteDomain/siteUserId/cartId/cartItemId (+ optionnel productId/itemName) + file
 app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, res) => {
   let tmpPath = null;
 
   try {
-    const { adminUrl, siteDomain, siteUserId, cartId, cartItemId } = req.body || {};
+    const {
+      adminUrl,
+      siteDomain,
+      siteUserId,
+      cartId: cartIdFromFront,
+      cartItemId: cartItemIdFromFront,
+      productId,
+      itemName
+    } = req.body || {};
+
     const sd = normalizeSiteDomain(siteDomain);
 
-    if (!adminUrl || !sd || !siteUserId || !cartId || !cartItemId) {
+    if (!adminUrl || !sd || !siteUserId || !cartIdFromFront || !cartItemIdFromFront) {
       return res.status(400).json({
         ok: false,
         error: 'adminUrl/siteDomain/siteUserId/cartId/cartItemId required'
@@ -970,34 +1007,63 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
     const filename = req.file.originalname || 'upload.zip';
     const mimetype = req.file.mimetype || 'application/zip';
 
-    // ✅ recréer un FormData à CHAQUE tentative (sinon stream consommé)
-    const makeForm = (fieldName, repeat = 1) => {
+    // ✅ IMPORTANT: recréer un FormData à CHAQUE tentative (sinon stream consommé)
+    const makeForm = (fieldName) => {
       const form = new FormData();
-      for (let i = 0; i < repeat; i++) {
-        form.append(fieldName, fs.createReadStream(tmpPath), {
-          filename,
-          contentType: mimetype
-        });
-      }
+      form.append(fieldName, fs.createReadStream(tmpPath), {
+        filename,
+        contentType: mimetype
+      });
       return form;
     };
 
-        // ✅ Résolution robuste de l'item (comme Postman)
-    const cart = await callPressero({
-      adminUrl,
-      path: `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}/`,
-      method: 'GET',
-      query: { userId: siteUserId },
-      forceAuth: true
-    });
+    // Helpers locaux (n’entrent pas en collision avec d’autres définitions)
+    const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const _looksLikeFileAttached = (obj, name) => {
+      try {
+        const s = JSON.stringify(obj || {});
+        if (!s) return false;
+        return (name && s.includes(name)) || s.toLowerCase().includes('.zip');
+      } catch {
+        return false;
+      }
+    };
 
-    const items = cart?.Items || cart?.items || [];
-    let effectiveItemId = cartItemId;
+    // ✅ Fonction pour relire le panier (fallback si /{cartId}/ renvoie 404)
+    const fetchCart = async (useCartId) => {
+      try {
+        return await callPressero({
+          adminUrl,
+          path: `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(useCartId)}/`,
+          method: 'GET',
+          query: { userId: siteUserId },
+          forceAuth: true
+        });
+      } catch (e) {
+        if (e && e.status === 404) {
+          return await callPressero({
+            adminUrl,
+            path: `/api/cart/${encodeURIComponent(sd)}/`,
+            method: 'GET',
+            query: { userId: siteUserId },
+            forceAuth: true
+          });
+        }
+        throw e;
+      }
+    };
+
+    // ✅ 1) Relire le panier pour valider/résoudre itemId (comme Postman)
+    const cartBefore = await fetchCart(cartIdFromFront);
+    const resolvedCartId = cartBefore?.Id || cartIdFromFront;
+    const items = cartBefore?.Items || [];
+
+    let effectiveItemId = cartItemIdFromFront;
 
     const exists = items.some(x => String(x.ItemId || x.Id) === String(effectiveItemId));
 
     if (!exists) {
-      const { productId, itemName } = req.body || {};
+      // on tente de retrouver l’item par productId / itemName (si fournis)
       let found = null;
 
       if (productId) {
@@ -1024,35 +1090,21 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
       effectiveItemId = found.ItemId || found.Id;
     }
 
+    // ✅ 2) Endpoint EXACT conforme au test Postman : .../file/?userId=...
+    const base =
+      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(resolvedCartId)}` +
+      `/item/${encodeURIComponent(effectiveItemId)}/file/`;
 
-    // ✅ (Re)définir base + query + lastErr (c’était ce qui manquait => "base is not defined")
-        const base =
-      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
-      `/item/${encodeURIComponent(effectiveItemId)}/file`;
+    const query = { userId: siteUserId };
 
-    const query = {
-      userId: siteUserId
-      // tu peux ajouter fileName si besoin sur ton environnement :
-      // fileName: filename
-    };
+    // En pratique ton instance marche avec field=file.
+    // On garde 2 variantes (file / files) au cas où.
+    const attempts = [
+      { path: base, field: 'file'  },
+      { path: base, field: 'files' }
+    ];
 
     let lastErr = null;
-
-    // ✅ Variantes (slash final + nom de champ file/files + copie Postman key="")
-    const attempts = [
-      { path: `${base}/`, field: 'file',  repeat: 1 },
-      { path: `${base}`,  field: 'file',  repeat: 1 },
-      { path: `${base}/`, field: 'files', repeat: 1 },
-      { path: `${base}`,  field: 'files', repeat: 1 },
-
-      // Postman export: 2 files, key vide (name="")
-      { path: `${base}/`, field: '', repeat: 2 },
-      { path: `${base}`,  field: '', repeat: 2 },
-
-      // au cas où key vide mais 1 seul fichier
-      { path: `${base}/`, field: '', repeat: 1 },
-      { path: `${base}`,  field: '', repeat: 1 }
-    ];
 
     for (const a of attempts) {
       try {
@@ -1060,42 +1112,66 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
           adminUrl,
           path: a.path,
           method: 'PUT',
-          body: makeForm(a.field, a.repeat),
+          body: makeForm(a.field),
           query,
           forceAuth: true
         });
 
-        // ✅ Vérification après upload : relire le panier et inspecter l’item
-const cartAfter = await callPressero({
-  adminUrl,
-  path: `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}/`,
-  method: 'GET',
-  query: { userId: siteUserId },
-  forceAuth: true
-});
+        // ✅ 3) Vérification “race condition” : attendre que l’upload soit visible
+        let verify = {
+          attached: false,
+          tries: 0,
+          cartId: resolvedCartId,
+          itemId: effectiveItemId
+        };
 
-const itemsAfter = cartAfter?.Items || [];
-const it = itemsAfter.find(x => String(x.ItemId) === String(effectiveItemId)) || null;
+        for (let t = 0; t < 8; t++) {
+          verify.tries = t + 1;
 
-// Certains environnements stockent ailleurs, donc on expose quelques champs possibles
-const verify = {
-  cartId: cartAfter?.Id || null,
-  foundItem: !!it,
-  itemId: effectiveItemId,
-  productName: it?.ProductName || null,
-  productId: it?.ProductId || null,
-  // champs possibles selon versions
-  itemFiles: it?.Files || it?.ItemFiles || it?.Uploads || null,
-  cartUploads: cartAfter?.Uploads || null,
-  itemKeys: it ? Object.keys(it) : []
-};
+          const cartAfter = await fetchCart(resolvedCartId);
+          const itemsAfter = cartAfter?.Items || [];
+          const it = itemsAfter.find(x => String(x.ItemId || x.Id) === String(effectiveItemId)) || null;
 
+          const itemFiles = it?.Files || it?.ItemFiles || it?.Uploads || null;
+          const cartUploads = cartAfter?.Uploads || null;
 
-        return res.json({ ok: true, raw, used: a, effectiveItemId, verify });
+          const itemHasList = Array.isArray(itemFiles) && itemFiles.length > 0;
+          const cartHasList = Array.isArray(cartUploads) && cartUploads.length > 0;
+          const nameFound = _looksLikeFileAttached(it, filename) || _looksLikeFileAttached(cartAfter, filename);
+
+          if (itemHasList || cartHasList || nameFound) {
+            verify.attached = true;
+            verify.productName = it?.ProductName || null;
+            verify.productId = it?.ProductId || null;
+            verify.itemFilesCount = Array.isArray(itemFiles) ? itemFiles.length : null;
+            verify.cartUploadsCount = Array.isArray(cartUploads) ? cartUploads.length : null;
+            break;
+          }
+
+          await _sleep(500);
+        }
+
+        if (!verify.attached) {
+          return res.status(409).json({
+            ok: false,
+            error: 'Upload non persisté (retry timeout)',
+            used: a,
+            effectiveItemId,
+            verify
+          });
+        }
+
+        return res.json({
+          ok: true,
+          raw,
+          used: a,
+          effectiveItemId,
+          verify
+        });
       } catch (e) {
         lastErr = e;
         if (e && e.status === 404) continue; // test variante suivante
-        throw e; // sinon stop (401/400/500)
+        throw e; // 401/400/500 => stop direct
       }
     }
 
@@ -1113,6 +1189,7 @@ const verify = {
     }
   }
 });
+
 
 
 
