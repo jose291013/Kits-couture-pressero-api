@@ -971,56 +971,58 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
     const mimetype = req.file.mimetype || 'application/zip';
 
     // ✅ IMPORTANT: recréer un FormData à CHAQUE tentative (sinon stream consommé)
-    const makeForm = (fieldName) => {
-      const form = new FormData();
-      form.append(fieldName, fs.createReadStream(tmpPath), {
-        filename,
-        contentType: mimetype
-      });
-      return form;
-    };
+    // ✅ IMPORTANT: recréer un FormData à CHAQUE tentative (sinon stream consommé)
+const makeForm = (fieldName, repeat = 1) => {
+  const form = new FormData();
 
-    const base =
-      `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
-      `/item/${encodeURIComponent(cartItemId)}/file`;
+  for (let i = 0; i < repeat; i++) {
+    // ⚠️ champ vide possible (name="")
+    form.append(fieldName, fs.createReadStream(tmpPath), {
+      filename,
+      contentType: mimetype
+    });
+  }
 
-    const query = { userId: siteUserId };
+  return form;
+};
 
-    // ✅ Variantes testées (slash final + nom de champ file/files)
-    const attempts = [
-      { path: `${base}/`, field: 'file'  },
-      { path: `${base}`,  field: 'file'  },
-      { path: `${base}/`, field: 'files' },
-      { path: `${base}`,  field: 'files' }
-    ];
+// ...
 
-    let lastErr = null;
+// ✅ Variantes testées : slash final + nom de champ file/files/"" + 1 ou 2 fichiers
+const attempts = [
+  { path: `${base}/`, field: 'file',  repeat: 1 },
+  { path: `${base}`,  field: 'file',  repeat: 1 },
+  { path: `${base}/`, field: 'files', repeat: 1 },
+  { path: `${base}`,  field: 'files', repeat: 1 },
 
-    for (const a of attempts) {
-      try {
-        const raw = await callPressero({
-          adminUrl,
-          path: a.path,
-          method: 'PUT',
-          body: makeForm(a.field),
-          query,
-          forceAuth: true
-        });
+  // 👇 copies “Postman export” (2 files, key vide)
+  { path: `${base}/`, field: '', repeat: 2 },
+  { path: `${base}`,  field: '', repeat: 2 },
 
-        return res.json({
-          ok: true,
-          raw,
-          used: { path: a.path, field: a.field }
-        });
-      } catch (e) {
-        lastErr = e;
-        // Si c'est un 404, on tente la variante suivante
-        if (e && e.status === 404) continue;
+  // 👇 au cas où Pressero accepte key vide mais 1 seul fichier
+  { path: `${base}/`, field: '', repeat: 1 },
+  { path: `${base}`,  field: '', repeat: 1 }
+];
 
-        // Pour autres erreurs (401/400/500), on stoppe direct (plus utile)
-        throw e;
-      }
-    }
+for (const a of attempts) {
+  try {
+    const raw = await callPressero({
+      adminUrl,
+      path: a.path,
+      method: 'PUT',
+      body: makeForm(a.field, a.repeat),
+      query,
+      forceAuth: true
+    });
+
+    return res.json({ ok: true, raw, used: a });
+  } catch (e) {
+    lastErr = e;
+    if (e && e.status === 404) continue;
+    throw e;
+  }
+}
+
 
     // Si tout a échoué
     throw lastErr || new Error('Upload failed: no attempt succeeded');
