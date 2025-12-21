@@ -982,10 +982,53 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
       return form;
     };
 
+        // ✅ Résolution robuste de l'item (comme Postman)
+    const cart = await callPressero({
+      adminUrl,
+      path: `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}/`,
+      method: 'GET',
+      query: { userId: siteUserId },
+      forceAuth: true
+    });
+
+    const items = cart?.Items || cart?.items || [];
+    let effectiveItemId = cartItemId;
+
+    const exists = items.some(x => String(x.ItemId || x.Id) === String(effectiveItemId));
+
+    if (!exists) {
+      const { productId, itemName } = req.body || {};
+      let found = null;
+
+      if (productId) {
+        found = items.slice().reverse().find(x =>
+          String(x.ProductId || '').toLowerCase() === String(productId || '').toLowerCase()
+        );
+      }
+
+      if (!found && itemName) {
+        found = items.slice().reverse().find(x =>
+          String(x.ItemName || x.ProductName || '') === String(itemName)
+        );
+      }
+
+      if (!found && items.length) found = items[items.length - 1];
+
+      if (!found) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Unable to resolve cart item for upload (cart has no items)'
+        });
+      }
+
+      effectiveItemId = found.ItemId || found.Id;
+    }
+
+
     // ✅ (Re)définir base + query + lastErr (c’était ce qui manquait => "base is not defined")
-    const base =
+        const base =
       `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}` +
-      `/item/${encodeURIComponent(cartItemId)}/file`;
+      `/item/${encodeURIComponent(effectiveItemId)}/file`;
 
     const query = {
       userId: siteUserId
@@ -1022,7 +1065,7 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
           forceAuth: true
         });
 
-        return res.json({ ok: true, raw, used: a });
+        return res.json({ ok: true, raw, used: a, effectiveItemId });
       } catch (e) {
         lastErr = e;
         if (e && e.status === 404) continue; // test variante suivante

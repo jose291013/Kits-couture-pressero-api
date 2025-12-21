@@ -1566,10 +1566,23 @@ async function addBundleForRow(cartId, tr, kitName, notesCommon) {
   if (!r.ok || !j.ok) throw new Error('add-bundle failed: ' + JSON.stringify(j));
 
   // hostItemId = livret > pochette > patron (côté serveur)
+    // hostItemId = livret > pochette > patron (côté serveur)
   tr.dataset.cartHostItemId = j.hostItemId || '';
   tr.dataset.cartId = j.cartId || cartId;
 
+  // ✅ NOUVEAU : premier item du bundle (ordre = items[] envoyés)
+  var first = '';
+  if (j && Array.isArray(j.added)) {
+    var found = j.added.find(function(x){ return x && x.itemId; });
+    if (found) first = found.itemId;
+  }
+  if (!first) first = j.hostItemId || '';
+
+  j.firstItemId = first;
+  tr.dataset.cartFirstItemId = first;
+
   return j;
+
 }
 
 
@@ -1637,8 +1650,11 @@ function initSendToCartButton() {
       if (!cartId) throw new Error('cartId introuvable');
 
       // 2) add bundles
-      var rows = Array.from(document.querySelectorAll('tr[data-kit-row]'));
+            var rows = Array.from(document.querySelectorAll('tr[data-kit-row]'));
       var comment = (document.getElementById('kitsComment')?.value || '').trim();
+
+      var zipFile = getZipFile ? getZipFile() : null;
+      var zipName = zipFile ? zipFile.name : '';
 
       var hasUpdate = hasUpdateRequest();
       var firstHostItemId = null;
@@ -1654,13 +1670,17 @@ function initSendToCartButton() {
         var updateYes = updateSel && isYesValue(updateSel.value);
 
         var notes = 'Kit: ' + kitName + ' | MAJ fichier: ' + (updateYes ? 'OUI' : 'NON');
+        if (updateYes && zipName) notes += ' | Fichier chargé : "' + zipName + '"';
         if (comment) notes += ' | Commentaire: ' + comment;
+
 
         var bundle = await addBundleForRow(cartId, tr, kitName, notes);
 
-        if (updateYes && bundle && bundle.hostItemId && !firstHostItemId) {
-          firstHostItemId = bundle.hostItemId;
-        }
+        if (updateYes && bundle && !firstHostItemId) {
+  var id = bundle.firstItemId || bundle.hostItemId || '';
+  if (id) firstHostItemId = id;
+}
+
         if (updateYes) updatesSummary.push(kitName);
       }
 
@@ -1669,6 +1689,8 @@ function initSendToCartButton() {
         var f = document.getElementById('kitsZipInput')?.files?.[0];
         if (!f) throw new Error('ZIP manquant');
         if (!firstHostItemId) throw new Error('Impossible de déterminer l’item hôte (aucun item ajouté).');
+
+        console.log('[ZIP] upload sur item =', firstHostItemId);
 
         await uploadZipOnce(cartId, firstHostItemId, f);
       }
