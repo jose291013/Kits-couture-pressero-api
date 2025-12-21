@@ -1564,6 +1564,8 @@ async function addBundleForRow(cartId, tr, kitName, notesCommon) {
 
   var j = await r.json();
   if (!r.ok || !j.ok) throw new Error('add-bundle failed: ' + JSON.stringify(j));
+  console.log('[ZIP] upload response =', j);
+
 
   // hostItemId = livret > pochette > patron (côté serveur)
     // hostItemId = livret > pochette > patron (côté serveur)

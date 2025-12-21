@@ -1065,7 +1065,33 @@ app.post('/admin/pressero/cart/item-file', upload.single('file'), async (req, re
           forceAuth: true
         });
 
-        return res.json({ ok: true, raw, used: a, effectiveItemId });
+        // ✅ Vérification après upload : relire le panier et inspecter l’item
+const cartAfter = await callPressero({
+  adminUrl,
+  path: `/api/cart/${encodeURIComponent(sd)}/${encodeURIComponent(cartId)}/`,
+  method: 'GET',
+  query: { userId: siteUserId },
+  forceAuth: true
+});
+
+const itemsAfter = cartAfter?.Items || [];
+const it = itemsAfter.find(x => String(x.ItemId) === String(effectiveItemId)) || null;
+
+// Certains environnements stockent ailleurs, donc on expose quelques champs possibles
+const verify = {
+  cartId: cartAfter?.Id || null,
+  foundItem: !!it,
+  itemId: effectiveItemId,
+  productName: it?.ProductName || null,
+  productId: it?.ProductId || null,
+  // champs possibles selon versions
+  itemFiles: it?.Files || it?.ItemFiles || it?.Uploads || null,
+  cartUploads: cartAfter?.Uploads || null,
+  itemKeys: it ? Object.keys(it) : []
+};
+
+
+        return res.json({ ok: true, raw, used: a, effectiveItemId, verify });
       } catch (e) {
         lastErr = e;
         if (e && e.status === 404) continue; // test variante suivante
