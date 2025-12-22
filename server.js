@@ -4,6 +4,7 @@ const { google } = require('googleapis');
 const multer = require('multer');
 const FormData = require('form-data');
 const fs = require('fs');
+const https = require('https');
 
 
 // ====== CONFIG ENV ======
@@ -639,6 +640,50 @@ async function getPresseroToken(adminUrl) {
   return token;
 }
 
+function httpsFormFetch(url, { method, headers, form }) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const reqHeaders = { ...headers };
+
+    // form-data peut calculer la longueur totale => on la met si possible
+    form.getLength((err, length) => {
+      if (!err && Number.isFinite(length)) {
+        reqHeaders['Content-Length'] = String(length);
+      } else {
+        // si longueur inconnue, ne pas forcer un Content-Length
+        delete reqHeaders['Content-Length'];
+      }
+
+      const req = https.request(
+        {
+          protocol: u.protocol,
+          hostname: u.hostname,
+          port: u.port || 443,
+          method,
+          path: u.pathname + u.search,
+          headers: reqHeaders
+        },
+        (res) => {
+          const chunks = [];
+          res.on('data', (d) => chunks.push(d));
+          res.on('end', () => {
+            const text = Buffer.concat(chunks).toString('utf8');
+            resolve({
+              status: res.statusCode || 0,
+              ok: (res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300,
+              text: async () => text
+            });
+          });
+        }
+      );
+
+      req.on('error', reject);
+      form.pipe(req);
+    });
+  });
+}
+
+
 /**
  * ✅ Supporte 2 signatures :
  *  - callPressero({ adminUrl, path, method, body, query, headers, forceAuth })
@@ -704,18 +749,24 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
   }
 
   const doFetch = async (useAuth) => {
-    const hh = { ...h, ...extraHeaders };
-    if (useAuth && token) {
-  const authVal =
-    token.startsWith('token ') || token.startsWith('Bearer ')
-      ? token
-      : `token ${token}`;
+  const hh = { ...h, ...extraHeaders };
 
-  hh.Authorization = authVal;
-}
+  if (useAuth && token) {
+    const authVal =
+      token.startsWith('token ') || token.startsWith('Bearer ')
+        ? token
+        : `token ${token}`;
+    hh.Authorization = authVal;
+  }
 
-    return fetch(url, { method, headers: hh, body: requestBody });
-  };
+  // ✅ Si c’est un FormData "form-data", on évite fetch(undici) => https.request
+  if (requestBody && typeof requestBody.getHeaders === 'function') {
+    return httpsFormFetch(url, { method, headers: hh, form: requestBody });
+  }
+
+  // JSON / autres => fetch normal
+  return fetch(url, { method, headers: hh, body: requestBody });
+};
 
   let res = await doFetch(shouldUseAuth);
 
