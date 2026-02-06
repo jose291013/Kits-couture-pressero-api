@@ -41,6 +41,23 @@
       </button>
     </div>
 
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+=======
+    <div class="field-row">
+      <div>
+        <label for="presseroProductUrl">URL produit Pressero</label>
+        <input type="text" id="presseroProductUrl" placeholder="https://.../brochure-dist" />
+      </div>
+      <div>
+        <label for="presseroProductId">Product id</label>
+        <input type="text" id="presseroProductId" readonly />
+      </div>
+      <button type="button" id="presseroLookupProductId" class="btn btn-secondary">
+        Récupérer product id
+      </button>
+    </div>
+
+>>>>>>> main
     <div id="presseroStatus" class="status-bar"></div>
   </section>
 
@@ -1037,17 +1054,29 @@
         });
     }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
     function getPresseroAdminDom() {
+=======
+    function getPresseroDom() {
+>>>>>>> main
       return {
         adminUrlInput: document.getElementById('presseroAdminUrl'),
         siteDomainInput: document.getElementById('presseroSiteDomain'),
         userEmailInput: document.getElementById('presseroUserEmail'),
         userIdInput: document.getElementById('presseroUserId'),
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
         lookupUserBtn: document.getElementById('presseroLookupUserId'),
+=======
+        productUrlInput: document.getElementById('presseroProductUrl'),
+        productIdInput: document.getElementById('presseroProductId'),
+        btnLookupUserId: document.getElementById('presseroLookupUserId'),
+        btnLookupProductId: document.getElementById('presseroLookupProductId'),
+>>>>>>> main
         status: document.getElementById('presseroStatus')
       };
     }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
     function getPresseroModalDom() {
       return {
         livretUrlInput: document.getElementById('presseroLivretUrl'),
@@ -1148,6 +1177,19 @@
       }
 
       setStatus(adminDom.status, 'Recherche du user id...', 'info');
+=======
+    function resolvePresseroUserId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var email = safeTrim(dom.userEmailInput.value).toLowerCase();
+
+      if (!adminUrl || !siteDomain || !email) {
+        setStatus(dom.status, 'Admin URL, site domain et email requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du user id...', 'info');
+>>>>>>> main
 
       var url =
         API_BASE +
@@ -1165,15 +1207,22 @@
         })
         .then(function (data) {
           var userId = data && (data.userId || (data.user && data.user.UserId));
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
           if (adminDom.userIdInput) adminDom.userIdInput.value = userId || '';
           setStatus(
             adminDom.status,
+=======
+          if (dom.userIdInput) dom.userIdInput.value = userId || '';
+          setStatus(
+            dom.status,
+>>>>>>> main
             userId ? 'User id récupéré.' : 'User id introuvable.',
             userId ? 'success' : 'error'
           );
         })
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur user id Pressero', err);
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
           setStatus(adminDom.status, 'Erreur user id : ' + err.message, 'error');
         });
     }
@@ -1204,13 +1253,36 @@
       setStatus(adminDom.status, 'Chargement des options Pressero...', 'info');
 
       fetch(API_BASE + '/admin/pressero/options', {
+=======
+          setStatus(dom.status, 'Erreur user id : ' + err.message, 'error');
+        });
+    }
+
+    function resolvePresseroProductId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var productUrl = safeTrim(dom.productUrlInput.value);
+
+      if (!adminUrl || !siteDomain || !productUrl) {
+        setStatus(dom.status, 'Admin URL, site domain et URL produit requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du product id...', 'info');
+
+      fetch(API_BASE + '/admin/pressero/product-id', {
+>>>>>>> main
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminUrl: adminUrl,
           siteDomain: siteDomain,
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
           siteUserId: siteUserId,
           productId: productId
+=======
+          productUrl: productUrl
+>>>>>>> main
         })
       })
         .then(function (res) {
@@ -1218,6 +1290,7 @@
           return res.json();
         })
         .then(function (data) {
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
           var raw = data && data.raw ? data.raw : data;
           var options =
             (raw && raw.Options) ||
@@ -1235,6 +1308,19 @@
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur options Pressero', err);
           setStatus(adminDom.status, 'Erreur options : ' + err.message, 'error');
+=======
+          var productId = data && data.productId;
+          if (dom.productIdInput) dom.productIdInput.value = productId || '';
+          setStatus(
+            dom.status,
+            productId ? 'Product id récupéré.' : 'Product id introuvable.',
+            productId ? 'success' : 'error'
+          );
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur product id Pressero', err);
+          setStatus(dom.status, 'Erreur product id : ' + err.message, 'error');
+>>>>>>> main
         });
     }
 
@@ -1269,7 +1355,11 @@
 
       domGlobal = dom;
 
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
       var presseroDom = getPresseroAdminDom();
+=======
+      var presseroDom = getPresseroDom();
+>>>>>>> main
       var storedPressero = loadPresseroPrefs();
 
       if (presseroDom.adminUrlInput && storedPressero.adminUrl) {
@@ -1326,12 +1416,26 @@
         });
       }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
       if (presseroDom.lookupUserBtn) {
         presseroDom.lookupUserBtn.addEventListener('click', function () {
+=======
+      if (presseroDom.btnLookupUserId) {
+        presseroDom.btnLookupUserId.addEventListener('click', function () {
+>>>>>>> main
           resolvePresseroUserId(presseroDom);
         });
       }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+=======
+      if (presseroDom.btnLookupProductId) {
+        presseroDom.btnLookupProductId.addEventListener('click', function () {
+          resolvePresseroProductId(presseroDom);
+        });
+      }
+
+>>>>>>> main
       // Clic sur "Éditer"
       tbody.addEventListener('click', function (e) {
         var btn = e.target.closest('.kits-edit-btn');
