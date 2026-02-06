@@ -252,7 +252,7 @@
           ></textarea>
 
           <p class="small" style="margin-top:6px;">
-            Prix PJM estimé : <strong><span id="kitAdminPjmPrice">—</span></strong>
+            Prix PJM estimé : <strong><span id="kitAdminPjmPrice">-</span></strong>
           </p>
         </div>
 
@@ -515,7 +515,7 @@
       if (!email) return;
 
       console.log('[KITS ADMIN] fetch /admin/kits pour', email);
-      setStatus(status, 'Chargement des kits…', 'info');
+      setStatus(status, 'Chargement des kits...', 'info');
 
       fetch(API_BASE + '/admin/kits?email=' + encodeURIComponent(email))
         .then(function (res) {
@@ -596,7 +596,7 @@
           return parsed.selections;
         }
       } catch (e) {
-        console.warn('[KITS ADMIN] PJMOptionsJSON invalide, on l’ignore.', e);
+        console.warn('[KITS ADMIN] PJMOptionsJSON invalide, on l'ignore.', e);
       }
       return [];
     }
@@ -670,7 +670,7 @@
       inputs.forEach(function (el) {
         var val = (el.value || '').trim();
         if (!val && el.tagName === 'SELECT') {
-          // si rien de sélectionné sur un select, on n’envoie rien
+          // si rien de sélectionné sur un select, on n'envoie rien
           return;
         }
 
@@ -707,7 +707,7 @@
       pjmAutoRefreshTimer = setTimeout(function () {
         var m = getModalDom();
 
-        // 1) On lit d’abord le configurateur
+        // 1) On lit d'abord le configurateur
         var selections = getSelectionsFromConfigurator();
 
         // 2) Si vide (cas initial), on retombe sur le JSON déjà stocké
@@ -863,7 +863,7 @@
 
       currentPjmOptions = options;
 
-      // ⚠️ Très important :
+      // IMPORTANT: Très important :
       // - si on a déjà des selections (baseSelections), on les garde
       // - sinon, on reconstruit à partir des defaults PJM
       var newSelections =
@@ -890,7 +890,7 @@
         } else if (data.raw && data.raw.Price) {
           m.pjmPriceLabel.textContent = JSON.stringify(data.raw.Price);
         } else {
-          m.pjmPriceLabel.textContent = '—';
+          m.pjmPriceLabel.textContent = '-';
         }
       }
     })
@@ -994,7 +994,7 @@
         return;
       }
 
-      // On synchronise d’abord le configurateur -> textarea JSON
+      // On synchronise d'abord le configurateur -> textarea JSON
       var currentSelections = getSelectionsFromConfigurator();
       if (currentSelections.length && m.pjmTextarea) {
         m.pjmTextarea.value = JSON.stringify(
@@ -1542,7 +1542,7 @@
       if (m.btnLoadPjm) {
         m.btnLoadPjm.addEventListener('click', function () {
           console.log(
-            '[KITS ADMIN] Chargement / recalcul PJM (options+prix)…'
+            '[KITS ADMIN] Chargement / recalcul PJM (options+prix)...'
           );
 
           var selections = getSelectionsFromJsonTextarea(m);
@@ -1554,7 +1554,7 @@
         });
       }
 
-      // Préremplir l’email depuis #correo si possible
+      // Préremplir l'email depuis #correo si possible
       try {
         var correoDiv = document.getElementById('correo');
         if (correoDiv && correoDiv.textContent.trim() && !emailInput.value) {
