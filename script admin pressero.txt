@@ -41,6 +41,21 @@
       </button>
     </div>
 
+    <div class="field-row">
+      <div>
+        <label for="presseroProductUrl">URL produit Pressero</label>
+        <input type="text" id="presseroProductUrl" placeholder="https://.../brochure-dist" />
+      </div>
+      <div>
+        <label for="presseroProductId">Product id</label>
+        <input type="text" id="presseroProductId" readonly />
+      </div>
+      <button type="button" id="presseroLookupProductId" class="btn btn-secondary">
+        Récupérer product id
+      </button>
+    </div>
+
+
     <div id="presseroStatus" class="status-bar"></div>
   </section>
 
@@ -1037,13 +1052,24 @@
         });
     }
 
-    function getPresseroAdminDom() {
+
+        function getPresseroDom() {
+
       return {
         adminUrlInput: document.getElementById('presseroAdminUrl'),
         siteDomainInput: document.getElementById('presseroSiteDomain'),
         userEmailInput: document.getElementById('presseroUserEmail'),
         userIdInput: document.getElementById('presseroUserId'),
+
+        
+
         lookupUserBtn: document.getElementById('presseroLookupUserId'),
+
+        productUrlInput: document.getElementById('presseroProductUrl'),
+        productIdInput: document.getElementById('presseroProductId'),
+        btnLookupUserId: document.getElementById('presseroLookupUserId'),
+        btnLookupProductId: document.getElementById('presseroLookupProductId'),
+
         status: document.getElementById('presseroStatus')
       };
     }
@@ -1149,6 +1175,18 @@
 
       setStatus(adminDom.status, 'Recherche du user id...', 'info');
 
+    function resolvePresseroUserId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var email = safeTrim(dom.userEmailInput.value).toLowerCase();
+
+      if (!adminUrl || !siteDomain || !email) {
+        setStatus(dom.status, 'Admin URL, site domain et email requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du user id...', 'info');
+
       var url =
         API_BASE +
         '/admin/pressero/site-user?adminUrl=' +
@@ -1164,20 +1202,27 @@
           return res.json();
         })
         .then(function (data) {
-          var userId = data && (
-            data.userId ||
-            data.UserId ||
-            (data.user && (data.user.UserId || data.user.userId || data.user.Id))
-          );
+          var userId = data && (data.userId || (data.user && data.user.UserId));
+
           if (adminDom.userIdInput) adminDom.userIdInput.value = userId || '';
           setStatus(
             adminDom.status,
+
+          if (adminDom.userIdInput) adminDom.userIdInput.value = userId || '';
+          setStatus(
+            adminDom.status,
+
+          if (dom.userIdInput) dom.userIdInput.value = userId || '';
+          setStatus(
+            dom.status,
+
             userId ? 'User id récupéré.' : 'User id introuvable.',
             userId ? 'success' : 'error'
           );
         })
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur user id Pressero', err);
+
           setStatus(adminDom.status, 'Erreur user id : ' + err.message, 'error');
         });
     }
@@ -1208,13 +1253,39 @@
       setStatus(adminDom.status, 'Chargement des options Pressero...', 'info');
 
       fetch(API_BASE + '/admin/pressero/options', {
+
+          setStatus(dom.status, 'Erreur user id : ' + err.message, 'error');
+        });
+    }
+
+    function resolvePresseroProductId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var productUrl = safeTrim(dom.productUrlInput.value);
+
+      if (!adminUrl || !siteDomain || !productUrl) {
+        setStatus(dom.status, 'Admin URL, site domain et URL produit requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du product id...', 'info');
+
+      fetch(API_BASE + '/admin/pressero/product-id', {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminUrl: adminUrl,
           siteDomain: siteDomain,
+
           siteUserId: siteUserId,
           productId: productId
+
+          siteUserId: siteUserId,
+          productId: productId
+
+          productUrl: productUrl
+
         })
       })
         .then(function (res) {
@@ -1222,11 +1293,13 @@
           return res.json();
         })
         .then(function (data) {
+
           var raw = data && data.raw ? data.raw : data;
           var options =
             (raw && raw.Options) ||
             (raw && raw.options) ||
             [];
+
           var quantities =
             (raw && raw.Quantities) ||
             (raw && raw.quantities) ||
@@ -1240,6 +1313,11 @@
           json.options = options;
           json.quantities = quantities;
           json.selectedUom = selectedUom;
+
+
+          json.productId = productId;
+          json.options = options;
+
           if (jsonTextarea) {
             jsonTextarea.value = JSON.stringify(json, null, 2);
           }
@@ -1249,6 +1327,19 @@
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur options Pressero', err);
           setStatus(adminDom.status, 'Erreur options : ' + err.message, 'error');
+
+          var productId = data && data.productId;
+          if (dom.productIdInput) dom.productIdInput.value = productId || '';
+          setStatus(
+            dom.status,
+            productId ? 'Product id récupéré.' : 'Product id introuvable.',
+            productId ? 'success' : 'error'
+          );
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur product id Pressero', err);
+          setStatus(dom.status, 'Erreur product id : ' + err.message, 'error');
+
         });
     }
 
@@ -1283,7 +1374,11 @@
 
       domGlobal = dom;
 
+
       var presseroDom = getPresseroAdminDom();
+
+      var presseroDom = getPresseroDom();
+
       var storedPressero = loadPresseroPrefs();
 
       if (presseroDom.adminUrlInput && storedPressero.adminUrl) {
@@ -1340,11 +1435,27 @@
         });
       }
 
+
       if (presseroDom.lookupUserBtn) {
         presseroDom.lookupUserBtn.addEventListener('click', function () {
+
+      if (presseroDom.lookupUserBtn) {
+        presseroDom.lookupUserBtn.addEventListener('click', function () {
+
+      if (presseroDom.btnLookupUserId) {
+        presseroDom.btnLookupUserId.addEventListener('click', function () {
+
           resolvePresseroUserId(presseroDom);
         });
       }
+
+
+      if (presseroDom.btnLookupProductId) {
+        presseroDom.btnLookupProductId.addEventListener('click', function () {
+          resolvePresseroProductId(presseroDom);
+        });
+      }
+
 
       // Clic sur "Éditer"
       tbody.addEventListener('click', function (e) {
