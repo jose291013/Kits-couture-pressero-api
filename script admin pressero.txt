@@ -41,6 +41,26 @@
       </button>
     </div>
 
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+=======
+    <div class="field-row">
+      <div>
+        <label for="presseroProductUrl">URL produit Pressero</label>
+        <input type="text" id="presseroProductUrl" placeholder="https://.../brochure-dist" />
+      </div>
+      <div>
+        <label for="presseroProductId">Product id</label>
+        <input type="text" id="presseroProductId" readonly />
+      </div>
+      <button type="button" id="presseroLookupProductId" class="btn btn-secondary">
+        Récupérer product id
+      </button>
+    </div>
+
+>>>>>>> main
+>>>>>>> main
     <div id="presseroStatus" class="status-bar"></div>
   </section>
 
@@ -1037,17 +1057,40 @@
         });
     }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
     function getPresseroAdminDom() {
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+    function getPresseroAdminDom() {
+=======
+    function getPresseroDom() {
+>>>>>>> main
+>>>>>>> main
       return {
         adminUrlInput: document.getElementById('presseroAdminUrl'),
         siteDomainInput: document.getElementById('presseroSiteDomain'),
         userEmailInput: document.getElementById('presseroUserEmail'),
         userIdInput: document.getElementById('presseroUserId'),
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
         lookupUserBtn: document.getElementById('presseroLookupUserId'),
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+        lookupUserBtn: document.getElementById('presseroLookupUserId'),
+=======
+        productUrlInput: document.getElementById('presseroProductUrl'),
+        productIdInput: document.getElementById('presseroProductId'),
+        btnLookupUserId: document.getElementById('presseroLookupUserId'),
+        btnLookupProductId: document.getElementById('presseroLookupProductId'),
+>>>>>>> main
+>>>>>>> main
         status: document.getElementById('presseroStatus')
       };
     }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+>>>>>>> main
     function getPresseroModalDom() {
       return {
         livretUrlInput: document.getElementById('presseroLivretUrl'),
@@ -1148,6 +1191,22 @@
       }
 
       setStatus(adminDom.status, 'Recherche du user id...', 'info');
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+=======
+    function resolvePresseroUserId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var email = safeTrim(dom.userEmailInput.value).toLowerCase();
+
+      if (!adminUrl || !siteDomain || !email) {
+        setStatus(dom.status, 'Admin URL, site domain et email requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du user id...', 'info');
+>>>>>>> main
+>>>>>>> main
 
       var url =
         API_BASE +
@@ -1165,15 +1224,31 @@
         })
         .then(function (data) {
           var userId = data && (data.userId || (data.user && data.user.UserId));
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
           if (adminDom.userIdInput) adminDom.userIdInput.value = userId || '';
           setStatus(
             adminDom.status,
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+          if (adminDom.userIdInput) adminDom.userIdInput.value = userId || '';
+          setStatus(
+            adminDom.status,
+=======
+          if (dom.userIdInput) dom.userIdInput.value = userId || '';
+          setStatus(
+            dom.status,
+>>>>>>> main
+>>>>>>> main
             userId ? 'User id récupéré.' : 'User id introuvable.',
             userId ? 'success' : 'error'
           );
         })
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur user id Pressero', err);
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+>>>>>>> main
           setStatus(adminDom.status, 'Erreur user id : ' + err.message, 'error');
         });
     }
@@ -1204,13 +1279,44 @@
       setStatus(adminDom.status, 'Chargement des options Pressero...', 'info');
 
       fetch(API_BASE + '/admin/pressero/options', {
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+=======
+          setStatus(dom.status, 'Erreur user id : ' + err.message, 'error');
+        });
+    }
+
+    function resolvePresseroProductId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var productUrl = safeTrim(dom.productUrlInput.value);
+
+      if (!adminUrl || !siteDomain || !productUrl) {
+        setStatus(dom.status, 'Admin URL, site domain et URL produit requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du product id...', 'info');
+
+      fetch(API_BASE + '/admin/pressero/product-id', {
+>>>>>>> main
+>>>>>>> main
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminUrl: adminUrl,
           siteDomain: siteDomain,
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
           siteUserId: siteUserId,
           productId: productId
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+          siteUserId: siteUserId,
+          productId: productId
+=======
+          productUrl: productUrl
+>>>>>>> main
+>>>>>>> main
         })
       })
         .then(function (res) {
@@ -1218,11 +1324,16 @@
           return res.json();
         })
         .then(function (data) {
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+>>>>>>> main
           var raw = data && data.raw ? data.raw : data;
           var options =
             (raw && raw.Options) ||
             (raw && raw.options) ||
             [];
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
           var quantities =
             (raw && raw.Quantities) ||
             (raw && raw.quantities) ||
@@ -1236,6 +1347,11 @@
           json.options = options;
           json.quantities = quantities;
           json.selectedUom = selectedUom;
+=======
+
+          json.productId = productId;
+          json.options = options;
+>>>>>>> main
           if (jsonTextarea) {
             jsonTextarea.value = JSON.stringify(json, null, 2);
           }
@@ -1245,6 +1361,22 @@
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur options Pressero', err);
           setStatus(adminDom.status, 'Erreur options : ' + err.message, 'error');
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+=======
+          var productId = data && data.productId;
+          if (dom.productIdInput) dom.productIdInput.value = productId || '';
+          setStatus(
+            dom.status,
+            productId ? 'Product id récupéré.' : 'Product id introuvable.',
+            productId ? 'success' : 'error'
+          );
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur product id Pressero', err);
+          setStatus(dom.status, 'Erreur product id : ' + err.message, 'error');
+>>>>>>> main
+>>>>>>> main
         });
     }
 
@@ -1279,7 +1411,15 @@
 
       domGlobal = dom;
 
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
       var presseroDom = getPresseroAdminDom();
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+      var presseroDom = getPresseroAdminDom();
+=======
+      var presseroDom = getPresseroDom();
+>>>>>>> main
+>>>>>>> main
       var storedPressero = loadPresseroPrefs();
 
       if (presseroDom.adminUrlInput && storedPressero.adminUrl) {
@@ -1336,12 +1476,34 @@
         });
       }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
       if (presseroDom.lookupUserBtn) {
         presseroDom.lookupUserBtn.addEventListener('click', function () {
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+      if (presseroDom.lookupUserBtn) {
+        presseroDom.lookupUserBtn.addEventListener('click', function () {
+=======
+      if (presseroDom.btnLookupUserId) {
+        presseroDom.btnLookupUserId.addEventListener('click', function () {
+>>>>>>> main
+>>>>>>> main
           resolvePresseroUserId(presseroDom);
         });
       }
 
+<<<<<<< codex/simplify-admin-interface-for-kits-hbkafz
+=======
+<<<<<<< codex/simplify-admin-interface-for-kits-jkshix
+=======
+      if (presseroDom.btnLookupProductId) {
+        presseroDom.btnLookupProductId.addEventListener('click', function () {
+          resolvePresseroProductId(presseroDom);
+        });
+      }
+
+>>>>>>> main
+>>>>>>> main
       // Clic sur "Éditer"
       tbody.addEventListener('click', function (e) {
         var btn = e.target.closest('.kits-edit-btn');
