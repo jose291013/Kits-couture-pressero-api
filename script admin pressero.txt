@@ -14,6 +14,50 @@
     </div>
   </form>
 
+  <section class="kits-admin-pressero">
+    <h2>Pressero (admin)</h2>
+    <div class="field-row">
+      <div>
+        <label for="presseroAdminUrl">Admin URL</label>
+        <input type="text" id="presseroAdminUrl" placeholder="admin.ams.v6.pressero.com" />
+      </div>
+      <div>
+        <label for="presseroSiteDomain">Site domain</label>
+        <input type="text" id="presseroSiteDomain" placeholder="decoration.ams.v6.pressero.com" />
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div>
+        <label for="presseroUserEmail">Email utilisateur Pressero</label>
+        <input type="email" id="presseroUserEmail" placeholder="client@example.com" />
+      </div>
+      <div>
+        <label for="presseroUserId">Site user id</label>
+        <input type="text" id="presseroUserId" readonly />
+      </div>
+      <button type="button" id="presseroLookupUserId" class="btn btn-secondary">
+        Récupérer user id
+      </button>
+    </div>
+
+    <div class="field-row">
+      <div>
+        <label for="presseroProductUrl">URL produit Pressero</label>
+        <input type="text" id="presseroProductUrl" placeholder="https://.../brochure-dist" />
+      </div>
+      <div>
+        <label for="presseroProductId">Product id</label>
+        <input type="text" id="presseroProductId" readonly />
+      </div>
+      <button type="button" id="presseroLookupProductId" class="btn btn-secondary">
+        Récupérer product id
+      </button>
+    </div>
+
+    <div id="presseroStatus" class="status-bar"></div>
+  </section>
+
   <!-- Section liste des kits -->
   <section id="kitsSection" class="hidden">
     <div class="kits-header">
@@ -154,6 +198,20 @@
   .kits-admin-email-form .field-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
   .kits-admin-email-form label { display:block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
   #clientEmail { width: 100%; border-radius: 999px; border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; }
+  .kits-admin-pressero { margin: 16px 0 20px; padding: 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #f9fafb; }
+  .kits-admin-pressero h2 { margin: 0 0 12px; font-size: 16px; }
+  .kits-admin-pressero .field-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 10px; }
+  .kits-admin-pressero label { display:block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .kits-admin-pressero input[type="text"],
+  .kits-admin-pressero input[type="email"] {
+    width: 100%;
+    min-width: 220px;
+    border-radius: 999px;
+    border: 1px solid #d1d5db;
+    padding: 8px 12px;
+    font-size: 14px;
+    background: #fff;
+  }
   .kits-header { display:flex; justify-content: space-between; align-items:center; margin-bottom: 12px; }
   .kits-table-wrapper { border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
   .kits-table { width:100%; border-collapse:collapse; font-size: 13px; }
@@ -234,6 +292,7 @@
     var currentKits = [];
     var editingKitId = null;
     var domGlobal = null;
+    var PRESSERO_STORAGE_KEY = 'kitsAdminPressero';
 
     // État courant des options PJM
     var currentPjmOptions = [];
@@ -253,6 +312,36 @@
       statusEl.textContent = msg || '';
       statusEl.className = 'status-bar';
       if (type) statusEl.classList.add(type);
+    }
+
+    function normalizeAdminHost(value) {
+      return safeTrim(value)
+        .replace(/^https?:\/\//i, '')
+        .replace(/\/+$/, '');
+    }
+
+    function loadPresseroPrefs() {
+      try {
+        var raw = localStorage.getItem(PRESSERO_STORAGE_KEY);
+        if (!raw) return {};
+        var parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function savePresseroPrefs(prefs) {
+      try {
+        localStorage.setItem(PRESSERO_STORAGE_KEY, JSON.stringify(prefs));
+      } catch (e) {}
+    }
+
+    function updatePresseroPrefs(patch) {
+      var current = loadPresseroPrefs();
+      var next = Object.assign({}, current, patch);
+      savePresseroPrefs(next);
+      return next;
     }
 
     // ---------- Rendu du tableau de kits ----------
@@ -821,6 +910,101 @@
         });
     }
 
+    function getPresseroDom() {
+      return {
+        adminUrlInput: document.getElementById('presseroAdminUrl'),
+        siteDomainInput: document.getElementById('presseroSiteDomain'),
+        userEmailInput: document.getElementById('presseroUserEmail'),
+        userIdInput: document.getElementById('presseroUserId'),
+        productUrlInput: document.getElementById('presseroProductUrl'),
+        productIdInput: document.getElementById('presseroProductId'),
+        btnLookupUserId: document.getElementById('presseroLookupUserId'),
+        btnLookupProductId: document.getElementById('presseroLookupProductId'),
+        status: document.getElementById('presseroStatus')
+      };
+    }
+
+    function resolvePresseroUserId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var email = safeTrim(dom.userEmailInput.value).toLowerCase();
+
+      if (!adminUrl || !siteDomain || !email) {
+        setStatus(dom.status, 'Admin URL, site domain et email requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du user id...', 'info');
+
+      var url =
+        API_BASE +
+        '/admin/pressero/site-user?adminUrl=' +
+        encodeURIComponent(adminUrl) +
+        '&siteDomain=' +
+        encodeURIComponent(siteDomain) +
+        '&email=' +
+        encodeURIComponent(email);
+
+      fetch(url)
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          var userId = data && (data.userId || (data.user && data.user.UserId));
+          if (dom.userIdInput) dom.userIdInput.value = userId || '';
+          setStatus(
+            dom.status,
+            userId ? 'User id récupéré.' : 'User id introuvable.',
+            userId ? 'success' : 'error'
+          );
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur user id Pressero', err);
+          setStatus(dom.status, 'Erreur user id : ' + err.message, 'error');
+        });
+    }
+
+    function resolvePresseroProductId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var productUrl = safeTrim(dom.productUrlInput.value);
+
+      if (!adminUrl || !siteDomain || !productUrl) {
+        setStatus(dom.status, 'Admin URL, site domain et URL produit requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du product id...', 'info');
+
+      fetch(API_BASE + '/admin/pressero/product-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUrl: adminUrl,
+          siteDomain: siteDomain,
+          productUrl: productUrl
+        })
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          var productId = data && data.productId;
+          if (dom.productIdInput) dom.productIdInput.value = productId || '';
+          setStatus(
+            dom.status,
+            productId ? 'Product id récupéré.' : 'Product id introuvable.',
+            productId ? 'success' : 'error'
+          );
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur product id Pressero', err);
+          setStatus(dom.status, 'Erreur product id : ' + err.message, 'error');
+        });
+    }
+
     // ---------- Initialisation globale ----------
     function initKitsAdmin() {
       var emailInput = document.getElementById('clientEmail');
@@ -852,6 +1036,16 @@
 
       domGlobal = dom;
 
+      var presseroDom = getPresseroDom();
+      var storedPressero = loadPresseroPrefs();
+
+      if (presseroDom.adminUrlInput && storedPressero.adminUrl) {
+        presseroDom.adminUrlInput.value = storedPressero.adminUrl;
+      }
+      if (presseroDom.siteDomainInput && storedPressero.siteDomain) {
+        presseroDom.siteDomainInput.value = storedPressero.siteDomain;
+      }
+
       // bouton "Charger les kits"
       loadBtn.addEventListener('click', function (e) {
         e.preventDefault();
@@ -862,6 +1056,10 @@
           return;
         }
         loadKitsForEmail(email, dom);
+
+        if (presseroDom.userEmailInput && !presseroDom.userEmailInput.value.trim()) {
+          presseroDom.userEmailInput.value = email;
+        }
       });
 
       // Enter dans le champ email
@@ -876,6 +1074,34 @@
       if (newKitBtn) {
         newKitBtn.addEventListener('click', function () {
           openKitModal('new', null);
+        });
+      }
+
+      if (presseroDom.adminUrlInput) {
+        presseroDom.adminUrlInput.addEventListener('change', function () {
+          var normalized = normalizeAdminHost(presseroDom.adminUrlInput.value);
+          presseroDom.adminUrlInput.value = normalized;
+          updatePresseroPrefs({ adminUrl: normalized });
+        });
+      }
+
+      if (presseroDom.siteDomainInput) {
+        presseroDom.siteDomainInput.addEventListener('change', function () {
+          var normalized = normalizeAdminHost(presseroDom.siteDomainInput.value);
+          presseroDom.siteDomainInput.value = normalized;
+          updatePresseroPrefs({ siteDomain: normalized });
+        });
+      }
+
+      if (presseroDom.btnLookupUserId) {
+        presseroDom.btnLookupUserId.addEventListener('click', function () {
+          resolvePresseroUserId(presseroDom);
+        });
+      }
+
+      if (presseroDom.btnLookupProductId) {
+        presseroDom.btnLookupProductId.addEventListener('click', function () {
+          resolvePresseroProductId(presseroDom);
         });
       }
 
