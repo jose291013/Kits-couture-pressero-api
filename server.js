@@ -592,6 +592,20 @@ function normalizeSiteDomain(siteDomain) {
   return raw;
 }
 
+function extractProductUrlName(productUrl) {
+  const raw = String(productUrl || '').trim();
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    return parts[parts.length - 1] || '';
+  } catch (e) {
+    const parts = raw.split('/').filter(Boolean);
+    return parts[parts.length - 1] || raw;
+  }
+}
+
 async function getPresseroToken(adminUrl) {
   const host = normalizeHost(adminUrl);
   if (!host) throw new Error('adminUrl manquant');
@@ -792,6 +806,85 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
 
 
 // ===================== ADMIN - OPTIONS PRESSERO =====================
+app.get('/admin/pressero/site-user', async (req, res) => {
+  try {
+    const adminUrl = String(req.query.adminUrl || '').trim();
+    const siteDomain = normalizeSiteDomain(req.query.siteDomain || '');
+    const email = String(req.query.email || '').trim().toLowerCase();
+
+    if (!adminUrl || !siteDomain || !email) {
+      return res.status(400).json({ error: 'adminUrl/siteDomain/email requis' });
+    }
+
+    const path = `/api/site/${encodeURIComponent(siteDomain)}/users`;
+
+    const data = await callPressero(adminUrl, path, 'GET', null, {
+      email
+    });
+
+    const items = Array.isArray(data?.Items) ? data.Items : Array.isArray(data) ? data : [];
+    const user = items.find((item) => {
+      const userEmail = String(item?.Email || item?.email || '').toLowerCase();
+      return userEmail === email;
+    }) || items[0] || null;
+
+    return res.json({
+      ok: true,
+      userId: user?.UserId || user?.userId || user?.Id || user?.id || null,
+      user,
+      raw: data
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: 'Error loading Pressero user',
+      details: err.message
+    });
+  }
+});
+
+app.post('/admin/pressero/product-id', async (req, res) => {
+  try {
+    const { adminUrl, siteDomain, productUrl, urlName } = req.body || {};
+
+    const adminHost = String(adminUrl || '').trim();
+    const siteDomainNormalized = normalizeSiteDomain(siteDomain);
+    const resolvedUrlName = String(urlName || '').trim() || extractProductUrlName(productUrl);
+
+    if (!adminHost || !siteDomainNormalized || !resolvedUrlName) {
+      return res.status(400).json({
+        error: 'adminUrl/siteDomain/productUrl ou urlName requis'
+      });
+    }
+
+    const path = `/api/site/${encodeURIComponent(siteDomainNormalized)}/products`;
+    const query = { pageNumber: 0, pageSize: 5, includeDeleted: false };
+    const body = [
+      {
+        Column: 'UrlName',
+        Value: resolvedUrlName,
+        Operator: 'isequalto'
+      }
+    ];
+
+    const data = await callPressero(adminHost, path, 'POST', body, query);
+    const items = Array.isArray(data?.Items) ? data.Items : [];
+    const product = items[0] || null;
+
+    return res.json({
+      ok: true,
+      urlName: resolvedUrlName,
+      productId: product?.ProductId || product?.productId || null,
+      product,
+      raw: data
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: 'Error loading Pressero product',
+      details: err.message
+    });
+  }
+});
+
 app.post('/admin/pressero/options', async (req, res) => {
   try {
     const { adminUrl, siteDomain, siteUserId, productId } = req.body || {};
@@ -1324,4 +1417,3 @@ app.get('/kits', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ kits-couture-api listening on port ${PORT}`);
 });
-
