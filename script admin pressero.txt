@@ -1,5 +1,7 @@
 <div class="kits-admin-page">
   <h1>admin des kit coutures</h1>
+  <!-- VERSION: pressero-admin-modal-product-only -->
+  <!-- VERSION: pressero-admin-modal-product-only-v2 -->
 
   <!-- Formulaire email -->
   <form class="kits-admin-email-form">
