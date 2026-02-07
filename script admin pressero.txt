@@ -16,8 +16,6 @@
     </div>
   </form>
 
-  <!-- Pressero admin header (URL + domaine + user id) - PAS de product id ici -->
-  <!-- VERSION: pressero-admin-header-no-productid -->
   <section class="kits-admin-pressero">
     <h2>Pressero (admin)</h2>
     <div class="field-row">
@@ -44,6 +42,21 @@
         Récupérer user id
       </button>
     </div>
+
+    <div class="field-row">
+      <div>
+        <label for="presseroProductUrl">URL produit Pressero</label>
+        <input type="text" id="presseroProductUrl" placeholder="https://.../brochure-dist" />
+      </div>
+      <div>
+        <label for="presseroProductId">Product id</label>
+        <input type="text" id="presseroProductId" readonly />
+      </div>
+      <button type="button" id="presseroLookupProductId" class="btn btn-secondary">
+        Récupérer product id
+      </button>
+    </div>
+
 
     <div id="presseroStatus" class="status-bar"></div>
   </section>
@@ -429,6 +442,20 @@
       return next;
     }
 
+    function getPresseroDom() {
+      return {
+        adminUrlInput: document.getElementById('presseroAdminUrl'),
+        siteDomainInput: document.getElementById('presseroSiteDomain'),
+        userEmailInput: document.getElementById('presseroUserEmail'),
+        userIdInput: document.getElementById('presseroUserId'),
+        productUrlInput: document.getElementById('presseroProductUrl'),
+        productIdInput: document.getElementById('presseroProductId'),
+        btnLookupUserId: document.getElementById('presseroLookupUserId'),
+        btnLookupProductId: document.getElementById('presseroLookupProductId'),
+        status: document.getElementById('presseroStatus')
+      };
+    }
+
     // ---------- Rendu du tableau de kits ----------
     function renderKitsTable(tbody, kits) {
       tbody.innerHTML = '';
@@ -699,12 +726,10 @@
         // 1) On lit d'abord le configurateur
         var selections = getSelectionsFromConfigurator();
 
-        // 2) Si vide (cas initial), on retombe sur le JSON déjà stocké
         if (!selections.length && m && m.pjmTextarea && m.pjmTextarea.value.trim()) {
           selections = getSelectionsFromJsonTextarea(m);
         }
 
-        // 3) Appel PJM options+price
         callPjmOptionsAndPriceWithSelections(selections, m);
       }, 400);
     }
@@ -722,7 +747,6 @@
         return;
       }
 
-      // Index des selections pour pré-remplir
       var selIndex = {};
       (selections || []).forEach(function (sel) {
         var k = sel.optionId + '::' + sel.key;
@@ -736,7 +760,6 @@
         var settings = opt.Settings || opt.settings || [];
         var firstSetting = settings[0] || null;
 
-        // clé "logique" pour stockage : pour un select on met "value", sinon on reprend Key
         var settingKey = (Array.isArray(values) && values.length > 0)
           ? 'value'
           : (firstSetting ? String(firstSetting.Key || 'default') : 'default');
@@ -769,7 +792,6 @@
         var inputEl;
 
         if (Array.isArray(values) && values.length > 0) {
-          // Liste déroulante
           inputEl = document.createElement('select');
           inputEl.className = 'pjm-option-input form-control';
           inputEl.style.maxWidth = '260px';
@@ -791,7 +813,6 @@
 
           inputEl.setAttribute('data-option-key', 'value');
         } else {
-          // Champ texte / numérique libre
           inputEl = document.createElement('input');
           inputEl.type = 'text';
           inputEl.className = 'pjm-option-input form-control';
@@ -803,7 +824,6 @@
 
         inputEl.setAttribute('data-option-id', optId);
 
-        // Auto-refresh sur changement
         inputEl.addEventListener('change', schedulePjmAutoRefresh);
         if (inputEl.tagName === 'INPUT') {
           inputEl.addEventListener('blur', schedulePjmAutoRefresh);
@@ -816,16 +836,13 @@
 
     // ---------- Appel /admin/pjm/optionsandprice ----------
     function callPjmOptionsAndPriceWithSelections(selections, m) {
-  if (!m) m = getModalDom();
+      if (!m) m = getModalDom();
 
-  // On garde la sélection actuelle comme "source de vérité"
-  var baseSelections = Array.isArray(selections) ? selections : [];
+      var baseSelections = Array.isArray(selections) ? selections : [];
 
-  var payload = {
-    selections: baseSelections
-  };
-
-  console.log('[KITS ADMIN] POST /admin/pjm/optionsandprice payload =', payload);
+      var payload = {
+        selections: baseSelections
+      };
 
   fetch(API_BASE + '/admin/pjm/optionsandprice', {
     method: 'POST',
@@ -891,6 +908,23 @@
     });
 }
 
+          if (m.pjmPriceLabel) {
+            if (data.price != null) {
+              m.pjmPriceLabel.textContent = String(data.price);
+            } else if (data.raw && data.raw.Price) {
+              m.pjmPriceLabel.textContent = JSON.stringify(data.raw.Price);
+            } else {
+              m.pjmPriceLabel.textContent = '—';
+            }
+          }
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur /admin/pjm/optionsandprice :', err);
+          if (m.pjmPriceLabel) {
+            m.pjmPriceLabel.textContent = 'Erreur';
+          }
+        });
+    }
 
     // ---------- Ouverture / fermeture modale ----------
     function openKitModal(mode, kit) {
@@ -922,7 +956,6 @@
         !kit || isTruthyOui(kit.Active) || isTruthyOui(kit.active);
       m.activeCheckbox.checked = isActive;
 
-      // On remet le JSON sauvegardé dans la textarea
       m.pjmTextarea.value = safeTrim(
         kit && (kit.PJMOptionsJSON || kit.pjmOptionsJson)
       );
@@ -951,15 +984,13 @@
       syncProductIdInput(m.presseroPochetteJson, m.presseroPochetteProductId);
       syncProductIdInput(m.presseroPatronJson, m.presseroPatronProductId);
 
-      if (m.pjmPriceLabel) m.pjmPriceLabel.textContent = '-';
+      if (m.pjmPriceLabel) m.pjmPriceLabel.textContent = '—';
 
-      // message de base dans le configurateur
       if (m.pjmConfigurator) {
         m.pjmConfigurator.innerHTML =
           '<p class="small text-muted">Clique sur "Charger options PJM" pour initialiser ou recalculer la configuration.</p>';
       }
 
-      // Si on a déjà un JSON avec des selections, on réhydrate directement PJM
       var selectionsFromJson = getSelectionsFromJsonTextarea(m);
       if (selectionsFromJson.length) {
         callPjmOptionsAndPriceWithSelections(selectionsFromJson, m);
@@ -1041,13 +1072,24 @@
         });
     }
 
-    function getPresseroAdminDom() {
+
+        function getPresseroDom() {
+
       return {
         adminUrlInput: document.getElementById('presseroAdminUrl'),
         siteDomainInput: document.getElementById('presseroSiteDomain'),
         userEmailInput: document.getElementById('presseroUserEmail'),
         userIdInput: document.getElementById('presseroUserId'),
+
+        
+
         lookupUserBtn: document.getElementById('presseroLookupUserId'),
+
+        productUrlInput: document.getElementById('presseroProductUrl'),
+        productIdInput: document.getElementById('presseroProductId'),
+        btnLookupUserId: document.getElementById('presseroLookupUserId'),
+        btnLookupProductId: document.getElementById('presseroLookupProductId'),
+
         status: document.getElementById('presseroStatus')
       };
     }
@@ -1153,6 +1195,18 @@
 
       setStatus(adminDom.status, 'Recherche du user id...', 'info');
 
+    function resolvePresseroUserId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var email = safeTrim(dom.userEmailInput.value).toLowerCase();
+
+      if (!adminUrl || !siteDomain || !email) {
+        setStatus(dom.status, 'Admin URL, site domain et email requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du user id...', 'info');
+
       var url =
         API_BASE +
         '/admin/pressero/site-user?adminUrl=' +
@@ -1168,20 +1222,27 @@
           return res.json();
         })
         .then(function (data) {
-          var userId = data && (
-            data.userId ||
-            data.UserId ||
-            (data.user && (data.user.UserId || data.user.userId || data.user.Id))
-          );
+          var userId = data && (data.userId || (data.user && data.user.UserId));
+
           if (adminDom.userIdInput) adminDom.userIdInput.value = userId || '';
           setStatus(
             adminDom.status,
+
+          if (adminDom.userIdInput) adminDom.userIdInput.value = userId || '';
+          setStatus(
+            adminDom.status,
+
+          if (dom.userIdInput) dom.userIdInput.value = userId || '';
+          setStatus(
+            dom.status,
+
             userId ? 'User id récupéré.' : 'User id introuvable.',
             userId ? 'success' : 'error'
           );
         })
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur user id Pressero', err);
+
           setStatus(adminDom.status, 'Erreur user id : ' + err.message, 'error');
         });
     }
@@ -1212,13 +1273,39 @@
       setStatus(adminDom.status, 'Chargement des options Pressero...', 'info');
 
       fetch(API_BASE + '/admin/pressero/options', {
+
+          setStatus(dom.status, 'Erreur user id : ' + err.message, 'error');
+        });
+    }
+
+    function resolvePresseroProductId(dom) {
+      var adminUrl = normalizeAdminHost(dom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(dom.siteDomainInput.value);
+      var productUrl = safeTrim(dom.productUrlInput.value);
+
+      if (!adminUrl || !siteDomain || !productUrl) {
+        setStatus(dom.status, 'Admin URL, site domain et URL produit requis.', 'error');
+        return;
+      }
+
+      setStatus(dom.status, 'Recherche du product id...', 'info');
+
+      fetch(API_BASE + '/admin/pressero/product-id', {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminUrl: adminUrl,
           siteDomain: siteDomain,
+
           siteUserId: siteUserId,
           productId: productId
+
+          siteUserId: siteUserId,
+          productId: productId
+
+          productUrl: productUrl
+
         })
       })
         .then(function (res) {
@@ -1226,11 +1313,13 @@
           return res.json();
         })
         .then(function (data) {
+
           var raw = data && data.raw ? data.raw : data;
           var options =
             (raw && raw.Options) ||
             (raw && raw.options) ||
             [];
+
           var quantities =
             (raw && raw.Quantities) ||
             (raw && raw.quantities) ||
@@ -1244,6 +1333,11 @@
           json.options = options;
           json.quantities = quantities;
           json.selectedUom = selectedUom;
+
+
+          json.productId = productId;
+          json.options = options;
+
           if (jsonTextarea) {
             jsonTextarea.value = JSON.stringify(json, null, 2);
           }
@@ -1253,6 +1347,65 @@
         .catch(function (err) {
           console.error('[KITS ADMIN] Erreur options Pressero', err);
           setStatus(adminDom.status, 'Erreur options : ' + err.message, 'error');
+
+          var productId = data && data.productId;
+          if (dom.productIdInput) dom.productIdInput.value = productId || '';
+          setStatus(
+            dom.status,
+            productId ? 'Product id récupéré.' : 'Product id introuvable.',
+            productId ? 'success' : 'error'
+          );
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur product id Pressero', err);
+          setStatus(dom.status, 'Erreur product id : ' + err.message, 'error');
+
+        });
+    }
+
+    function resolvePresseroProductIdFor(kind, adminDom, modalDom) {
+      var adminUrl = normalizeAdminHost(adminDom.adminUrlInput.value);
+      var siteDomain = normalizeAdminHost(adminDom.siteDomainInput.value);
+
+      var urlInput = modalDom[kind + 'UrlInput'];
+      var productIdInput = modalDom[kind + 'ProductIdInput'];
+      var jsonTextarea = modalDom[kind + 'JsonTextarea'];
+
+      var productUrl = safeTrim(urlInput && urlInput.value);
+
+      if (!adminUrl || !siteDomain || !productUrl) {
+        setStatus(adminDom.status, 'Admin URL, site domain et URL produit requis.', 'error');
+        return;
+      }
+
+      setStatus(adminDom.status, 'Recherche du product id...', 'info');
+
+      fetch(API_BASE + '/admin/pressero/product-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUrl: adminUrl,
+          siteDomain: siteDomain,
+          productUrl: productUrl
+        })
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          var productId = data && data.productId;
+          if (productIdInput) productIdInput.value = productId || '';
+          if (productId) updateJsonProductId(jsonTextarea, productId);
+          setStatus(
+            adminDom.status,
+            productId ? 'Product id récupéré.' : 'Product id introuvable.',
+            productId ? 'success' : 'error'
+          );
+        })
+        .catch(function (err) {
+          console.error('[KITS ADMIN] Erreur product id Pressero', err);
+          setStatus(adminDom.status, 'Erreur product id : ' + err.message, 'error');
         });
     }
 
@@ -1287,7 +1440,11 @@
 
       domGlobal = dom;
 
+
       var presseroDom = getPresseroAdminDom();
+
+      var presseroDom = getPresseroDom();
+
       var storedPressero = loadPresseroPrefs();
 
       if (presseroDom.adminUrlInput && storedPressero.adminUrl) {
@@ -1344,11 +1501,27 @@
         });
       }
 
+
       if (presseroDom.lookupUserBtn) {
         presseroDom.lookupUserBtn.addEventListener('click', function () {
+
+      if (presseroDom.lookupUserBtn) {
+        presseroDom.lookupUserBtn.addEventListener('click', function () {
+
+      if (presseroDom.btnLookupUserId) {
+        presseroDom.btnLookupUserId.addEventListener('click', function () {
+
           resolvePresseroUserId(presseroDom);
         });
       }
+
+
+      if (presseroDom.btnLookupProductId) {
+        presseroDom.btnLookupProductId.addEventListener('click', function () {
+          resolvePresseroProductId(presseroDom);
+        });
+      }
+
 
       // Clic sur "Éditer"
       tbody.addEventListener('click', function (e) {
@@ -1468,6 +1641,5 @@
   })();
 </script>
 
-
-
 <div id="builder-content-end"></div>
+
