@@ -5,6 +5,9 @@ const multer = require('multer');
 const FormData = require('form-data');
 const fs = require('fs');
 const https = require('https');
+const PDFDocument = require('pdfkit');
+const { PassThrough } = require('stream');
+
 
 
 // ====== CONFIG ENV ======
@@ -924,6 +927,7 @@ app.post('/admin/pressero/price', async (req, res) => {
     if (!adminUrl || !siteDomain || !siteUserId || !productId) {
       return res.status(400).json({ error: 'adminUrl/siteDomain/siteUserId/productId requis' });
     }
+    
 
     const sd = normalizeSiteDomain(siteDomain);
 
@@ -1420,6 +1424,68 @@ app.get('/kits', async (req, res) => {
     });
   }
 });
+app.post('/admin/pressero/summary-pdf', async (req, res) => {
+  try {
+    const { kits, totals, orderInfo } = req.body || {};
+    if (!kits || typeof kits !== 'object') {
+      return res.status(400).json({ ok: false, error: 'kits manquant' });
+    }
+
+    // PDF en mémoire
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const chunks = [];
+    doc.on('data', (c) => chunks.push(c));
+    doc.on('end', () => {
+      const pdf = Buffer.concat(chunks);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="resume-production.pdf"');
+      res.status(200).send(pdf);
+    });
+
+    // ====== Contenu PDF (simple, propre) ======
+    const orderNumber = (orderInfo && orderInfo.orderNumber) ? String(orderInfo.orderNumber) : 'N/A';
+    const customerName = (orderInfo && orderInfo.customerName) ? String(orderInfo.customerName) : 'N/A';
+    const dateStr = (orderInfo && orderInfo.date) ? String(orderInfo.date) : new Date().toLocaleDateString('fr-FR');
+
+    doc.fontSize(18).text('Résumé de production', { align: 'left' });
+    doc.moveDown(0.6);
+    doc.fontSize(11).text(`Numéro commande : ${orderNumber}`);
+    doc.text(`Nom client : ${customerName}`);
+    doc.text(`Date : ${dateStr}`);
+    doc.moveDown(1);
+
+    // Table par kit
+    Object.keys(kits).forEach((kitName) => {
+      const k = kits[kitName] || {};
+      doc.fontSize(13).text(kitName, { underline: true });
+      doc.moveDown(0.3);
+      doc.fontSize(11).text(`Livrets : ${k.livrets || 0}`);
+      doc.text(`Pochettes : ${k.pochettes || 0}`);
+      doc.text(`Patrons : ${k.patrons || 0}`);
+      doc.text(`Mise en pochette (qté) : ${k.misePochetteQty || 0}`);
+      doc.text(`Pastilles (qté) : ${k.pastilleQty || 0}`);
+      doc.text(`Mise à jour fichier : ${k.majFichier || 'NON'}`);
+      doc.moveDown(0.8);
+      doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
+      doc.moveDown(0.8);
+    });
+
+    // Totaux globaux
+    doc.fontSize(13).text('Totaux globaux', { underline: true });
+    doc.moveDown(0.3);
+    doc.fontSize(11).text(`Total livrets : ${(totals && totals.livrets) || 0}`);
+    doc.text(`Total pochettes : ${(totals && totals.pochettes) || 0}`);
+    doc.text(`Total patrons : ${(totals && totals.patrons) || 0}`);
+    doc.text(`Total mise en pochette : ${(totals && totals.misePochetteQty) || 0}`);
+    doc.text(`Total pastilles : ${(totals && totals.pastilleQty) || 0}`);
+
+    doc.end();
+  } catch (e) {
+    console.error('[summary-pdf] error', e);
+    res.status(500).json({ ok: false, error: 'pdf failed', details: String(e.message || e) });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`✅ kits-couture-api listening on port ${PORT}`);

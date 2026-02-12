@@ -1,9 +1,8 @@
-<!-- START SCRIPT PAGE MES-KITS -->
+<!-- START SCRIPT FRONT PAGE MES-KITS -->
 <script>
 (function () {
   if (!/\/page\/mes-kits\/?$/i.test(window.location.pathname)) return;
 
-// === CONFIG FRONT ==
 
 // === CONFIG FRONT ===
 // Remplace par l'URL de ton serveur Render (sans slash final)
@@ -104,8 +103,8 @@ function getCurrentCustomerEmail() {
     var uploadRemoveBtn  = document.getElementById('kitsUploadRemove');
     var errorBox         = document.getElementById('kitsError');
 
-    var MIN_LIVRETS    = 100;
-    var MIN_POCHETTES  = 100;
+    var MIN_LIVRETS    = 10;
+    var MIN_POCHETTES  = 10;
 
     function ensureTotalHTBlock() {
   var bottom = document.getElementById('kitsBottomSection');
@@ -473,10 +472,132 @@ function buildKitsTableFromApiData(kits) {
     var defaultPochette = kit.defaultQtyPochette || 0;
     var defaultPatron   = kit.defaultQtyPatron   || 0;
 
-    tr.innerHTML =
-      '<td class="kc-kit-image"><div class="kc-image-placeholder"></div></td>' +
-      '<td class="kc-kit-name">' + (kit.name || '') + '</td>' +
-      '<td class="kc-cell-identique">' +
+    var imgUrl = String(kit.imageUrl || '').trim();
+var imgCell = '<td class="kc-kit-image"><div class="kc-image-placeholder"></div></td>';
+
+if (/^https?:\/\//i.test(imgUrl)) {
+  imgCell =
+    '<td class="kc-kit-image">' +
+      '<img class="kc-kit-thumb" src="' + imgUrl.replace(/"/g, '&quot;') + '" alt="">' +
+    '</td>';
+}
+// ================== LIGHTBOX IMAGE KIT (click sur imagette) ==================
+function ensureKitsImageLightbox() {
+  // CSS une seule fois
+  if (!document.getElementById('kitsImageLightboxStyle')) {
+    var st = document.createElement('style');
+    st.id = 'kitsImageLightboxStyle';
+    st.textContent = `
+      img.kc-kit-thumb { cursor: zoom-in; }
+      #kitsImageLightbox {
+        position: fixed; inset: 0;
+        display: none; align-items: center; justify-content: center;
+        padding: 24px;
+        background: rgba(0,0,0,.65);
+        z-index: 999999;
+      }
+      #kitsImageLightbox.is-open { display: flex; }
+      #kitsImageLightbox .kits-imglb-inner {
+        position: relative;
+        max-width: min(1100px, 96vw);
+        max-height: 92vh;
+      }
+      #kitsImageLightbox .kits-imglb-img {
+        max-width: 96vw;
+        max-height: 92vh;
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 18px 40px rgba(0,0,0,.35);
+        display: block;
+      }
+      #kitsImageLightbox .kits-imglb-close {
+        position: absolute;
+        top: -12px; right: -12px;
+        width: 34px; height: 34px;
+        border-radius: 999px;
+        border: none;
+        background: #fff;
+        cursor: pointer;
+        font-size: 20px;
+        line-height: 1;
+        box-shadow: 0 6px 16px rgba(0,0,0,.25);
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  // DOM une seule fois
+  var lb = document.getElementById('kitsImageLightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'kitsImageLightbox';
+          lb.innerHTML = `
+  <div class="kits-imglb-inner" role="dialog" aria-modal="true">
+    <button type="button" class="kits-imglb-close" aria-label="Fermer">×</button>
+    <div class="kits-imglb-title"></div>
+    <img class="kits-imglb-img" alt="">
+  </div>
+`;
+
+    document.body.appendChild(lb);
+
+    lb.addEventListener('click', function (e) {
+      if (e.target === lb || e.target.classList.contains('kits-imglb-close')) {
+        lb.classList.remove('is-open');
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') lb.classList.remove('is-open');
+    });
+  }
+
+  return lb;
+}
+
+function openKitImageLightbox(src, alt, title) {
+  if (!src) return;
+  var lb = ensureKitsImageLightbox();
+
+  var titleEl = lb.querySelector('.kits-imglb-title');
+  if (titleEl) titleEl.textContent = title || '';
+
+  var img = lb.querySelector('.kits-imglb-img');
+  if (img) {
+    img.src = src;
+    img.alt = alt || '';
+  }
+  lb.classList.add('is-open');
+}
+
+
+// Event delegation (marche même si le tableau est re-rendu)
+document.addEventListener('click', function (e) {
+  var img = e.target && e.target.closest ? e.target.closest('img.kc-kit-thumb') : null;
+  if (!img) return;
+
+  // évite un éventuel click sur la ligne / autres handlers
+  e.preventDefault();
+  e.stopPropagation();
+
+  var tr = img.closest('tr');
+var kitName =
+  (tr && tr.querySelector('.kc-kit-name') && tr.querySelector('.kc-kit-name').textContent || '').trim();
+
+openKitImageLightbox(
+  img.getAttribute('src'),
+  img.getAttribute('alt') || '',
+  kitName || 'Aperçu'
+);
+
+}, true);
+// =====================================================================
+
+
+tr.innerHTML =
+  imgCell +
+  '<td class="kc-kit-name">' + (kit.name || '') + '</td>' +
+       '<td class="kc-cell-identique">' +
         '<input type="number" class="kc-qty-identique kits-input-qte-identique" min="0" step="1" value="' + defaultLivret + '">' +
       '</td>' +
 
@@ -832,6 +953,67 @@ var globalCtx = {
   var zip = document.getElementById('kitsZipInput');
   return !!(zip && zip.files && zip.files[0]);
 }
+function buildProductionSummaryFromTable() {
+  var rows = Array.from(document.querySelectorAll('tr[data-kit-row]'));
+  var kits = {};
+
+  function readQty(tr, key) {
+    var el = tr.querySelector('.kits-input-qte-component[data-component="' + key + '"]');
+    if (!el) el = tr.querySelector('.kc-qty-' + key);
+    return toNum(el && el.value);
+  }
+
+  rows.forEach(function(tr){
+    var kitName = (tr.querySelector('.kc-kit-name')?.textContent || '').trim();
+    if (!kitName) kitName = 'Kit';
+
+    var qLivret   = readQty(tr, 'livret');
+    var qPochette = readQty(tr, 'pochette');
+    var qPatron   = readQty(tr, 'patron');
+
+    // si kit vide, on l’ignore
+    if ((qLivret + qPochette + qPatron) <= 0) return;
+
+    var qMe   = toNum(tr.querySelector('.kc-qty-mepochette')?.value);
+    var qPast = toNum(tr.querySelector('.kc-qty-stickers')?.value);
+
+    var updateSel = tr.querySelector('.kc-update-select');
+    var updateYes = updateSel && isYesValue(updateSel.value);
+
+    kits[kitName] = kits[kitName] || {
+      livrets: 0,
+      pochettes: 0,
+      patrons: 0,
+      misePochetteQty: 0,
+      pastilleQty: 0,
+      majFichier: 'NON'
+    };
+
+    kits[kitName].livrets += qLivret;
+    kits[kitName].pochettes += qPochette;
+    kits[kitName].patrons += qPatron;
+
+    // spécifique pochette
+    kits[kitName].misePochetteQty += qMe;
+    kits[kitName].pastilleQty += qPast;
+
+    // MAJ fichier : si au moins une ligne kit est OUI, on met OUI
+    if (updateYes) kits[kitName].majFichier = 'OUI';
+  });
+
+  // totaux globaux (pour ton PDF)
+  var totals = { livrets: 0, pochettes: 0, patrons: 0, misePochetteQty: 0, pastilleQty: 0 };
+  Object.keys(kits).forEach(function(k){
+    totals.livrets += kits[k].livrets || 0;
+    totals.pochettes += kits[k].pochettes || 0;
+    totals.patrons += kits[k].patrons || 0;
+    totals.misePochetteQty += kits[k].misePochetteQty || 0;
+    totals.pastilleQty += kits[k].pastilleQty || 0;
+  });
+
+  return { kits: kits, totals: totals };
+}
+
 
 function removeAllUploadedFiles() {
   var zip = document.getElementById('kitsZipInput');
@@ -1587,6 +1769,42 @@ async function addBundleForRow(cartId, tr, kitName, notesCommon) {
 
 }
 
+async function checkZipOnItem(itemId) {
+  var ctx = getPresseroContext();
+
+  var r = await fetch(KITS_API_BASE_URL + '/admin/pressero/cart/get', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      adminUrl: ctx.adminUrl,
+      siteDomain: ctx.siteDomain,
+      siteUserId: ctx.siteUserId
+    })
+  });
+
+  var j = await r.json();
+  if (!r.ok || !j.ok) throw new Error('cart/get failed: ' + JSON.stringify(j));
+
+  var cart = j.raw;
+  var item = (cart.Items || []).find(function(x){
+    return String(x.ItemId) === String(itemId);
+  });
+
+  if (!item) throw new Error('Item not found in cart: ' + itemId);
+
+  var zip = (item.Uploads || []).find(function(u){
+    return ((u && u.Name) ? String(u.Name).toLowerCase() : '').endsWith('.zip');
+  });
+
+  return {
+    hasZip: !!zip,
+    zipName: zip ? zip.Name : null,
+    zipUrl: zip ? zip.Url : null,
+    uploads: item.Uploads || []
+  };
+}
+
+
 
 async function uploadZipOnce(cartId, hostItemId, file) {
   var ctx = getPresseroContext();
@@ -1608,6 +1826,29 @@ async function uploadZipOnce(cartId, hostItemId, file) {
   if (!r.ok || !j.ok) throw new Error('upload zip failed: ' + JSON.stringify(j));
   return j;
 }
+async function uploadFileOnce(cartId, cartItemId, blobOrFile, filename) {
+  var ctx = getPresseroContext();
+
+  var fd = new FormData();
+  fd.append('adminUrl', ctx.adminUrl);
+  fd.append('siteDomain', ctx.siteDomain);
+  fd.append('siteUserId', ctx.siteUserId);
+  fd.append('cartId', cartId);
+  fd.append('cartItemId', cartItemId);
+
+  // ✅ permet d’uploader un Blob en lui donnant un nom de fichier
+  fd.append('file', blobOrFile, filename || (blobOrFile && blobOrFile.name) || 'file.bin');
+
+  var r = await fetch(KITS_API_BASE_URL + '/admin/pressero/cart/item-file', {
+    method: 'POST',
+    body: fd
+  });
+
+  var j = await r.json();
+  if (!r.ok || !j.ok) throw new Error('upload file failed: ' + JSON.stringify(j));
+  return j;
+}
+
 
 function initSendToCartButton() {
   // ✅ accepte les 2 IDs (ancien + nouveau)
@@ -1661,6 +1902,8 @@ function initSendToCartButton() {
       var hasUpdate = hasUpdateRequest();
       var firstHostItemId = null;
       var updatesSummary = [];
+      var firstItemForPdf = null; // ✅ premier item ajouté (peu importe MAJ fichier)
+
 
       for (var i = 0; i < rows.length; i++) {
         var tr = rows[i];
@@ -1677,6 +1920,11 @@ function initSendToCartButton() {
 
 
         var bundle = await addBundleForRow(cartId, tr, kitName, notes);
+        if (bundle && !firstItemForPdf) {
+  var idPdf = bundle.firstItemId || bundle.hostItemId || '';
+  if (idPdf) firstItemForPdf = idPdf;
+}
+
 
         if (updateYes && bundle && !firstHostItemId) {
   var id = bundle.firstItemId || bundle.hostItemId || '';
@@ -1685,6 +1933,41 @@ function initSendToCartButton() {
 
         if (updateYes) updatesSummary.push(kitName);
       }
+      // ✅ Générer + injecter le PDF résumé production (une seule fois, après avoir ajouté tous les items)
+if (firstItemForPdf) {
+  var summary = buildProductionSummaryFromTable();
+
+  // si aucun kit détecté, on n’uploade rien
+  if (summary && summary.kits && Object.keys(summary.kits).length) {
+    var email = getCurrentCustomerEmail() || '';
+
+    var pdfRes = await fetch(KITS_API_BASE_URL + '/admin/pressero/summary-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kits: summary.kits,
+        totals: summary.totals,
+        orderInfo: {
+          orderNumber: 'N/A',
+          customerName: email || 'N/A',
+          date: new Date().toLocaleDateString('fr-FR')
+        }
+      })
+    });
+
+    if (!pdfRes.ok) {
+      var txt = '';
+      try { txt = await pdfRes.text(); } catch(e) {}
+      throw new Error('summary-pdf failed HTTP ' + pdfRes.status + (txt ? ' ' + txt : ''));
+    }
+
+    var pdfBlob = await pdfRes.blob();
+
+    // upload sur le 1er item ajouté au panier
+    await uploadFileOnce(cartId, firstItemForPdf, pdfBlob, 'resume-production.pdf');
+  }
+}
+
 
       // 3) upload ZIP (une seule fois sur l’item hôte)
       if (hasUpdate) {
@@ -1695,6 +1978,14 @@ function initSendToCartButton() {
         console.log('[ZIP] upload sur item =', firstHostItemId);
 
         await uploadZipOnce(cartId, firstHostItemId, f);
+
+        var check = await checkZipOnItem(firstHostItemId);
+        if (!check.hasZip) {
+  throw new Error("Le ZIP n'apparaît pas dans Uploads de l'item après upload.");
+}
+        console.log('[ZIP] attached ?', check.hasZip, 'name=', check.zipName, 'url=', check.zipUrl);
+
+
       }
 
       // 4) rediriger vers le panier
@@ -1779,4 +2070,4 @@ if (document.readyState === 'loading') {
 })();
 </script>
 
-<!-- END SCRIPT PAGE MES-KITS -->
+<!-- END SCRIPT FRONT PAGE MES-KITS -->
