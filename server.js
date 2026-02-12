@@ -751,7 +751,10 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
     requestBody = JSON.stringify(body);
   }
 
-  const shouldUseAuth = true;
+  const isCartApi = String(path || '').startsWith('/api/cart/');
+const isV2Api   = String(path || '').startsWith('/api/v2/');
+const shouldUseAuth = forceAuth || (isV2Api && !isCartApi);
+
 
   let token = null;
   if (shouldUseAuth) {
