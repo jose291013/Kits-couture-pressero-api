@@ -753,7 +753,8 @@ async function callPressero(adminUrlOrOpts, pathArg, methodArg = 'GET', bodyArg 
 
   const isCartApi = String(path || '').startsWith('/api/cart/');
 const isV2Api   = String(path || '').startsWith('/api/v2/');
-const shouldUseAuth = forceAuth || (isV2Api && !isCartApi);
+const shouldUseAuth = forceAuth || isCartApi || isV2Api;
+
 
 
   let token = null;
@@ -768,13 +769,11 @@ const shouldUseAuth = forceAuth || (isV2Api && !isCartApi);
   const doFetch = async (useAuth) => {
   const hh = { ...h, ...extraHeaders };
 
-  if (useAuth && token) {
-    const authVal =
-      token.startsWith('token ') || token.startsWith('Bearer ')
-        ? token
-        : `token ${token}`;
-    hh.Authorization = authVal;
-  }
+ if (useAuth && token) {
+  const cleanToken = token.replace(/^Bearer\s+/i, '').replace(/^token\s+/i, '');
+  hh.Authorization = `Bearer ${cleanToken}`;
+}
+
 
   // ✅ Si c’est un FormData "form-data", on évite fetch(undici) => https.request
   if (requestBody && typeof requestBody.getHeaders === 'function') {
